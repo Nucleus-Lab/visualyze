@@ -1,18 +1,44 @@
 import { useState, useEffect } from 'react'
 import FileExplorer from './components/FileExplorer'
 import Chat from './components/Chat'
-import { FaFolder, FaComments, FaChevronRight, FaChevronLeft, FaChevronDown, FaChevronUp } from 'react-icons/fa'
+import { FaFolder, FaComments, FaChevronRight, FaChevronLeft, FaChevronDown, FaChevronUp, FaCrown, FaToggleOn, FaSignOutAlt } from 'react-icons/fa'
+import { usePrivy, useWallets, useLogout } from '@privy-io/react-auth'
 import * as d3 from "d3";
 import React from "react";
+import { checkSubscription, subscribe } from './utils/contract';
 
 function App() {
-  const [isFileExplorerOpen, setIsFileExplorerOpen] = useState(true)
+  const { login, ready, authenticated, user, wallet } = usePrivy();
+  const { wallets, ready: walletsReady } = useWallets();
+  const { logout } = useLogout({
+    onSuccess: () => {
+      console.log('Successfully logged out');
+      // Clear any local state if needed
+      localStorage.removeItem('username');
+      localStorage.removeItem('walletAddress');
+    }
+  });
+  const [isFileExplorerOpen, setIsFileExplorerOpen] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [selectedVisualizations, setSelectedVisualizations] = useState([])
   const [visualizationComponents, setVisualizationComponents] = useState({})
   const [fileStructure, setFileStructure] = useState({
     visualizations: {}
   })
+  // Mock subscription state - will be replaced with actual contract interaction
+  const [hasSubscription, setHasSubscription] = useState(false)
+  const [subscriptionExpiry, setSubscriptionExpiry] = useState(null)
+
+  // Temporary function to toggle subscription state
+  const toggleSubscription = () => {
+    setHasSubscription(prev => !prev);
+    if (!hasSubscription) {
+      // Set expiry to 30 days from now when subscribing
+      setSubscriptionExpiry(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+    } else {
+      setSubscriptionExpiry(null);
+    }
+  };
 
   // Add keyboard shortcuts
   useEffect(() => {
@@ -61,6 +87,25 @@ function App() {
     loadVisualizationFiles()
   }, [])
 
+  // Effect to check subscription status when user is authenticated
+  useEffect(() => {
+    const checkUserSubscription = async () => {
+      if (authenticated && user?.wallet?.address && wallets.length > 0) {
+        try {
+          console.log("Checking subscription status for user");
+          const subscription = await checkSubscription(user.wallet.address, wallets[0]);
+          setHasSubscription(subscription.hasSubscription);
+          setSubscriptionExpiry(subscription.expiryDate);
+          console.log("Subscription status updated:", subscription);
+        } catch (error) {
+          console.error('Error checking subscription:', error);
+        }
+      }
+    };
+
+    checkUserSubscription();
+  }, [authenticated, user?.wallet?.address, wallets]);
+
   const handleVisualizationSelect = async (path) => {
     console.log("Selected visualization:", path);
     const fileName = path.split("/").pop();
@@ -97,13 +142,81 @@ function App() {
       }
     }
   };
-  
+
+  // Update handleSubscribe to use the contract
+  const handleSubscribe = async () => {
+    try {
+      if (!user?.wallet?.address || wallets.length === 0) {
+        console.error('No wallet connected');
+        return;
+      }
+
+      console.log("Starting subscription process");
+      // Subscribe using the contract
+      await subscribe(wallets[0]);
+      
+      // Check updated subscription status
+      const subscription = await checkSubscription(user.wallet.address, wallets[0]);
+      setHasSubscription(subscription.hasSubscription);
+      setSubscriptionExpiry(subscription.expiryDate);
+      console.log("Subscription completed successfully");
+    } catch (error) {
+      console.error('Error subscribing:', error);
+      // You might want to show an error message to the user here
+    }
+  };
+
+  // Handle logout with wallet disconnection
+  const handleLogout = async () => {
+    try {
+      // 1. Try to disconnect wallet if supported
+      if (wallet?.disconnect) {
+        try {
+          await wallet.disconnect();
+        } catch (error) {
+          console.warn('Wallet disconnect failed, proceeding with logout:', error);
+        }
+      }
+      
+      // 2. Use Privy's logout
+      await logout();
+      
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
+  // If Privy is not ready, show loading state
+  if (!ready) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#12121A]">
+        <div className="text-white text-lg">Loading...</div>
+      </div>
+    );
+  }
+
+  // If user is not authenticated, show login screen
+  if (!authenticated) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#12121A]">
+        <div className="text-center">
+          <h1 className="text-2xl text-white mb-6">Welcome to Data Visualization App</h1>
+          <button
+            onClick={login}
+            className="px-6 py-3 bg-[#D4A017] text-white rounded-lg hover:bg-[#B38A14] transition-colors"
+          >
+            Login with Privy
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-screen overflow-hidden">
       {/* File Explorer Pane */}
-      <div className={`flex h-full transition-all duration-300 ${isFileExplorerOpen ? 'w-64' : 'w-12'}`}>
-        <div className={`h-full flex ${isFileExplorerOpen ? 'w-full bg-[#22222E]' : 'w-12 bg-[#22222E]'}`}>
+      <div className={`flex h-full transition-all duration-300 ${isFileExplorerOpen ? 'w-60' : 'w-12'}`}>
+        <div className={`h-full flex flex-col ${isFileExplorerOpen ? 'w-full bg-[#22222E]' : 'w-12 bg-[#22222E]'}`}>
           {isFileExplorerOpen ? (
             // Full File Explorer
             <>
@@ -120,6 +233,58 @@ function App() {
                     fileStructure={fileStructure} 
                     onFileSelect={handleVisualizationSelect}
                   />
+                </div>
+              </div>
+              {/* Subscription Status and Button */}
+              <div className="border-t border-[#1A1A24] p-4">
+                <div className="flex flex-col gap-3">
+                  {/* Wallet Address */}
+                  <div className="text-sm text-gray-400 break-all">
+                    {user?.wallet?.address ? 
+                      `${user.wallet.address.slice(0, 6)}...${user.wallet.address.slice(-4)}` : 
+                      'No wallet connected'}
+                  </div>
+                  {/* Subscription Status */}
+                  {hasSubscription ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm text-[#D4A017]">
+                        <FaCrown className="w-4 h-4" />
+                        <span>Premium until {subscriptionExpiry?.toLocaleDateString()}</span>
+                      </div>
+                      <button
+                        onClick={toggleSubscription}
+                        className="text-xs text-gray-400 hover:text-white transition-colors"
+                        title="Toggle subscription state (temporary)"
+                      >
+                        <FaToggleOn className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={handleSubscribe}
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-[#D4A017] text-white rounded-lg hover:bg-[#B38A14] transition-colors text-sm"
+                      >
+                        <FaCrown className="w-4 h-4" />
+                        Subscribe Now
+                      </button>
+                      <button
+                        onClick={toggleSubscription}
+                        className="text-xs text-gray-400 hover:text-white transition-colors"
+                        title="Toggle subscription state (temporary)"
+                      >
+                        <FaToggleOn className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                  {/* Logout Button */}
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-[#2D2D3B] text-gray-400 hover:text-white hover:bg-[#3C3C4E] rounded-lg transition-colors text-sm mt-2"
+                  >
+                    <FaSignOutAlt className="w-4 h-4" />
+                    Logout
+                  </button>
                 </div>
               </div>
             </>
