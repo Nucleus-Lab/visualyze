@@ -13,13 +13,10 @@ module.exports = {
     }
   },
   networks: {
-    // bscTestnet: {
-    //   url: "https://data-seed-prebsc-1-s1.binance.org:8545",
-    //   chainId: 97,
-    //   accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
-    // },
-    hardhat: {
-      chainId: 31337,
+    bscTestnet: {
+      url: "https://bsc-testnet.infura.io/v3/" + process.env.INFURA_API_KEY,
+      chainId: 97,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
     },
   },
   etherscan: {
