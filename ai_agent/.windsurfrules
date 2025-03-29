@@ -1,0 +1,4 @@
+1. 用的是conda的虚拟环境，叫ai_dune
+2. 你的terminal没有被conda init过，所以你得自己想办法
+3. 这是conda路径/home/nucleus/Miniconda3/condabin/conda
+4. 遇到觉得自己没法处理的问题就联网搜索
