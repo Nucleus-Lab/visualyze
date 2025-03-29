@@ -136,23 +136,3 @@ ORDER BY 1 DESC
 # 执行查询
 results_df, error = client.create_and_execute_query(sql)
 ```
-
-## 更新日志
-
-### 2025-03-26
-- 优化了错误处理逻辑
-- 改进了SQL语法检查
-- 添加了更详细的日志记录
-- 修复了Markdown代码块标记问题
-
-## 贡献指南
-
-1. Fork 项目
-2. 创建您的特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交您的更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 打开一个 Pull Request
-
-## 许可证
-
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详细信息
