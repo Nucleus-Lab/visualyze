@@ -42,11 +42,6 @@ def plot_graph(prompt: str, task: str, csv_filepath: str):
     viz_code = plotter.plot_by_prompt(prompt, task, file_name, description, sample_data)
     return viz_code
 
-<<<<<<< HEAD
-from agents.temp.temp_agent import temp_mock_agent
-def main(prompt: str, csv_dir: str, viz_dir: str):
-    
-=======
 
 def analyze_figure(prompt: str, attachments: list[str]):
     analyzer = AnalyzeFigureAgent()
@@ -54,10 +49,8 @@ def analyze_figure(prompt: str, attachments: list[str]):
 
 
 def generate_figures(prompt: str, csv_dir: str, viz_dir: str):
->>>>>>> agents
     os.makedirs(csv_dir, exist_ok=True)
     os.makedirs(viz_dir, exist_ok=True)
-    
 
     planner = Planner()
     sql_generator = SqlGenerateAgent(
@@ -70,7 +63,6 @@ def generate_figures(prompt: str, csv_dir: str, viz_dir: str):
     # tasks = planner.split_task_by_prompt(prompt, sql_generator.full_table_list)
     tasks = planner.split_task_by_prompt(prompt)
     results = []
-    
 
     def process_task(task, sql_generator, dune_client, csv_dir, viz_dir, prompt):
         result = {"task": task, "result": "failed"}
@@ -109,7 +101,7 @@ def generate_figures(prompt: str, csv_dir: str, viz_dir: str):
 
         csv_path = os.path.join(csv_dir, f"{task_filename}.csv")
         if df is not None:
-            # df.to_csv(csv_path, index=False)
+            df.to_csv(csv_path, index=False)
             viz_path = os.path.join(viz_dir, f"{task_filename}.js")
             if df is not None:
                 viz_code = plot_graph(prompt, task, csv_path)
@@ -117,12 +109,10 @@ def generate_figures(prompt: str, csv_dir: str, viz_dir: str):
                     f.write(viz_code)
                 result["file_name"] = task_filename
                 result["result"] = "success"
-                print(f"Saved at {viz_path} successfully")
         else:
             result["result"] = "No information found for this task"
             return result
 
-        print("result", result)
         return result
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
@@ -135,10 +125,6 @@ def generate_figures(prompt: str, csv_dir: str, viz_dir: str):
         results = [
             future.result() for future in concurrent.futures.as_completed(futures)
         ]
-        
-    print("results from dune", results)
-        
-    results = temp_mock_agent(prompt, csv_dir, viz_dir)
 
     return results
 
