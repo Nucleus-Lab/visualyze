@@ -1,0 +1,86 @@
+{
+  "conversations": [
+    {
+      "id": "7ba8ac1d-f7a3-42b7-a553-5d6733bce0b0",
+      "title": "New Conversation",
+      "created_at": "2025-03-30T00:49:14.220515",
+      "nodes": [
+        {
+          "id": "1ecaa6ea-54d3-4873-a7b8-41ec7a5424e1",
+          "type": "root",
+          "timestamp": "2025-03-30T00:49:14.220515",
+          "content": "Conversation started",
+          "parentId": null
+        },
+        {
+          "id": "e6b52fe9-ef43-46f7-85ff-93bb3e286773",
+          "timestamp": "2025-03-30T00:50:29.041975",
+          "parentId": "1ecaa6ea-54d3-4873-a7b8-41ec7a5424e1",
+          "messages": [
+            {
+              "type": "user",
+              "timestamp": "2025-03-30T00:50:29.041975",
+              "content": "hgjgjlkjjib"
+            },
+            {
+              "type": "ai",
+              "timestamp": "2025-03-30T00:50:30.101434",
+              "content": "This is a mock AI response. The actual AI integration will be implemented later."
+            }
+          ]
+        },
+        {
+          "id": "9cca0d28-b80c-4b01-90a9-7aa6d5e9c0f5",
+          "timestamp": "2025-03-30T00:50:38.425851",
+          "parentId": "e6b52fe9-ef43-46f7-85ff-93bb3e286773",
+          "messages": [
+            {
+              "type": "user",
+              "timestamp": "2025-03-30T00:50:38.425851",
+              "content": "bbj2"
+            },
+            {
+              "type": "ai",
+              "timestamp": "2025-03-30T00:50:39.451556",
+              "content": "This is a mock AI response. The actual AI integration will be implemented later."
+            }
+          ]
+        },
+        {
+          "id": "8065e92c-9665-416d-8862-6ef355de52d5",
+          "timestamp": "2025-03-30T00:50:42.623505",
+          "parentId": "9cca0d28-b80c-4b01-90a9-7aa6d5e9c0f5",
+          "messages": [
+            {
+              "type": "user",
+              "timestamp": "2025-03-30T00:50:42.623505",
+              "content": "67gjkl"
+            },
+            {
+              "type": "ai",
+              "timestamp": "2025-03-30T00:50:43.641461",
+              "content": "This is a mock AI response. The actual AI integration will be implemented later."
+            }
+          ]
+        },
+        {
+          "id": "f385aeda-2271-486a-82bb-352cfd677460",
+          "timestamp": "2025-03-30T00:54:33.398567",
+          "parentId": "8065e92c-9665-416d-8862-6ef355de52d5",
+          "messages": [
+            {
+              "type": "user",
+              "timestamp": "2025-03-30T00:54:33.398567",
+              "content": "hgjgkjhlkl;jhhuhbfg"
+            },
+            {
+              "type": "ai",
+              "timestamp": "2025-03-30T00:54:34.413420",
+              "content": "This is a mock AI response. The actual AI integration will be implemented later."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
