@@ -125,18 +125,34 @@ def generate_figures(prompt: str, csv_dir: str, viz_dir: str):
         
         # Add 1 minute timeout
         try:
-            results = [
-                future.result(timeout=60) for future in concurrent.futures.as_completed(futures)
-            ]
+            # Set a timeout for the entire group of futures
+            completed_futures = []
+            for future in concurrent.futures.as_completed(futures, timeout=60):
+                try:
+                    result = future.result()
+                    completed_futures.append(future)
+                    results.append(result)
+                    print(f"✅ Task completed successfully: {result.get('task', 'Unknown')[:50]}...")
+                except Exception as e:
+                    print(f"❌ Task failed with error: {str(e)}")
         except concurrent.futures.TimeoutError:
-            print("❌ One or more tasks timed out after 1 minute")
+            print("❌ Timeout reached after 1 minute. Cancelling remaining tasks...")
             # Cancel any pending futures
-            for future in futures:
+            timed_out_futures = [f for f in futures if f not in completed_futures]
+            print(f"⏱️ {len(timed_out_futures)} tasks timed out and will be cancelled")
+            
+            # Get results from completed tasks only
+            for future in completed_futures:
+                if future.done() and not future.cancelled():
+                    try:
+                        if future.result() not in results:  # Avoid duplicates
+                            results.append(future.result())
+                    except Exception as e:
+                        print(f"❌ Error retrieving result: {str(e)}")
+            
+            # Cancel remaining tasks
+            for future in timed_out_futures:
                 future.cancel()
-            # Collect results from completed tasks
-            results = [
-                future.result() for future in futures if future.done() and not future.cancelled()
-            ]
 
     return results
 

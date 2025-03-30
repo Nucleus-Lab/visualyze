@@ -67,7 +67,7 @@ const GeneratedViz = () => {
         .style("font-size", "16px")
         .text("Ethereum Average Daily Price Over the Last 7 Days");
     });
-
+    console.log("Hello")
     return () => {
       d3.select(container).select("svg").remove();
     };

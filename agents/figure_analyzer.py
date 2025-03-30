@@ -41,7 +41,7 @@ class AnalyzeFigureAgent:
             )
 
         response = self.client.chat.completions.create(
-            model=os.getenv("MODEL"),
+            model=os.getenv("MODEL_NAME"),
             messages=[{"role": "user", "content": content}],
             max_tokens=1000,
         )

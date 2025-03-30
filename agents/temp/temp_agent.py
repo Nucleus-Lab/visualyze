@@ -81,7 +81,7 @@ def temp_mock_agent(prompt, csv_dir=None, viz_dir=None):
         # Create a result entry similar to what the real agent would return
         results.append({
             "result": "success",
-            "file_name": new_js_filename,
+            "file_name": base_name,
             "task": f"Visualize {base_name} data",  # Add a mock task description
             "csv_file": new_csv_filename if csv_dir else None
         })
