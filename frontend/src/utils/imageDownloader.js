@@ -42,7 +42,10 @@ export const downloadVisualizationImage = async (svgContainerSelector, displayNa
     const url = URL.createObjectURL(svgBlob);
     
     // Create a clean filename from the display name
-    const filename = `${displayName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`;
+    // split the display name into name and extension
+    const name = displayName.split(".")[0];
+    const extension = displayName.split(".")[1];
+    const filename = `${name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`;
     
     return new Promise((resolve, reject) => {
       let serverResponse;

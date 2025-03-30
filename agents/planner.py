@@ -4,7 +4,11 @@ import json
 
 
 class TaskSplitter(dspy.Signature):
-    """You are an expert in Dune Analytics. You are given a user's prompt. You need to split the user's prompt into a list of tasks. Each task is a retrieval task that seek information from the available tables."""
+    """You are an expert in Dune Analytics. You are given a user's prompt. You need to split the user's prompt into a list of tasks. Each task is a retrieval task that seek information from the available tables.
+    # Guidelines
+    1. If no need to split the user's prompt, just return list with one task: [user's prompt]
+    2. Do not repeat the tasks, be distinct
+    """
 
     prompt = dspy.InputField(prefix="User's prompt:")
     reasoning: str = dspy.OutputField(prefix="Reasoning:")

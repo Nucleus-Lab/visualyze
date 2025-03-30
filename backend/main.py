@@ -291,71 +291,71 @@ async def list_template_visualizations():
 ## MAIN FUNCTION
 
 # Endpoint for generating visualizations
-async def generate_visualization(data):
-    """
-    Generate visualizations based on user prompt and input files.
+# async def generate_visualization(data):
+#     """
+#     Generate visualizations based on user prompt and input files.
     
-    Takes the user prompt and file paths, generates visualizations,
-    and returns paths to the created files.
-    """
-    print("visualization-data:", data)
-    try:
-        prompt = data.get("prompt")
-        wallet_address = data.get("walletAddress")
-        file_paths = data.get("filePaths", [])
+#     Takes the user prompt and file paths, generates visualizations,
+#     and returns paths to the created files.
+#     """
+#     print("visualization-data:", data)
+#     try:
+#         prompt = data.get("prompt")
+#         wallet_address = data.get("walletAddress")
+#         file_paths = data.get("filePaths", [])
         
-        if not prompt:
-            raise HTTPException(status_code=400, detail="Missing prompt")
+#         if not prompt:
+#             raise HTTPException(status_code=400, detail="Missing prompt")
         
-        if not wallet_address:
-            raise HTTPException(status_code=400, detail="Missing wallet address")
+#         if not wallet_address:
+#             raise HTTPException(status_code=400, detail="Missing wallet address")
             
-        logger.info(f"Generating visualization for wallet {wallet_address}: {prompt[:50]}...")
+#         logger.info(f"Generating visualization for wallet {wallet_address}: {prompt[:50]}...")
         
-        # Save the prompt to the backend/data/prompts.txt
-        with open("backend/data/prompts.txt", "a", encoding="utf-8") as f:
-            f.write(f"{datetime.now()} [VIZ]: {prompt}\n")
+#         # Save the prompt to the backend/data/prompts.txt
+#         with open("backend/data/prompts.txt", "a", encoding="utf-8") as f:
+#             f.write(f"{datetime.now()} [VIZ]: {prompt}\n")
         
-        # Get or create user directory
-        user_viz_dir = get_user_visualization_dir(wallet_address)
+#         # Get or create user directory
+#         user_viz_dir = get_user_visualization_dir(wallet_address)
         
-        print("prompt:", prompt)
-        print("file_paths:", file_paths)
+#         print("prompt:", prompt)
+#         print("file_paths:", file_paths)
         
-        # Generate visualization results
-        results = prompt_agent(prompt, csv_dir=DATA_DIR, viz_dir=user_viz_dir, attachments=file_paths)
-        # results = temp_mock_agent(prompt, csv_dir=DATA_DIR, viz_dir=user_viz_dir)
+#         # Generate visualization results
+#         results = prompt_agent(prompt, csv_dir=DATA_DIR, viz_dir=user_viz_dir, attachments=file_paths)
+#         # results = temp_mock_agent(prompt, csv_dir=DATA_DIR, viz_dir=user_viz_dir)
         
-        print("visualization results:", results)
+#         print("visualization results:", results)
         
-        if not isinstance(results, list):
-            raise HTTPException(status_code=500, detail="Expected list result from visualization generation")
+#         if not isinstance(results, list):
+#             raise HTTPException(status_code=500, detail="Expected list result from visualization generation")
             
-        # Get the sanitized wallet address for the response
-        sanitized_address = wallet_address.replace('0x', '').lower()
+#         # Get the sanitized wallet address for the response
+#         sanitized_address = wallet_address.replace('0x', '').lower()
         
-        filenames = []
+#         filenames = []
         
-        for r in results:
-            if r['result'] == "success":
-                filenames.append(f"{sanitized_address}/{r['file_name']}.js")
-                logger.info(f"Created new visualization file for user {wallet_address}: {r['file_name']}")
+#         for r in results:
+#             if r['result'] == "success":
+#                 filenames.append(f"{sanitized_address}/{r['file_name']}.js")
+#                 logger.info(f"Created new visualization file for user {wallet_address}: {r['file_name']}")
                 
-                # Copy the corresponding CSV file to the target directory
-                base_name = r['file_name']
-                csv_filename = f"{base_name}.csv"
-                csv_source_path = os.path.join(DATA_DIR, csv_filename)
-                csv_dest_path = os.path.join(TARGET_DATA_DIR, csv_filename)
-                shutil.copy2(csv_source_path, csv_dest_path)
+#                 # Copy the corresponding CSV file to the target directory
+#                 base_name = r['file_name']
+#                 csv_filename = f"{base_name}.csv"
+#                 csv_source_path = os.path.join(DATA_DIR, csv_filename)
+#                 csv_dest_path = os.path.join(TARGET_DATA_DIR, csv_filename)
+#                 shutil.copy2(csv_source_path, csv_dest_path)
             
-        return {
-            "success": True,
-            "message": "Visualization generated successfully",
-            "filenames": filenames  # Return paths with wallet address
-        }
-    except Exception as e:
-        logger.error(f"Error generating visualization: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+#         return {
+#             "success": True,
+#             "message": "Visualization generated successfully",
+#             "filenames": filenames  # Return paths with wallet address
+#         }
+#     except Exception as e:
+#         logger.error(f"Error generating visualization: {str(e)}")
+#         raise HTTPException(status_code=500, detail=str(e))
 
 # Endpoint for data analysis
 async def analyze_data(data):

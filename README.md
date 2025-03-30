@@ -152,3 +152,4 @@ return React.createElement("div", { ref: chartRef, className: "w-full h-full bg-
 
 #TODO: font for visualizations?
 professional
+# TODO: prompt to unlock wallet

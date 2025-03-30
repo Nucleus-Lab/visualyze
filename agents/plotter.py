@@ -18,6 +18,7 @@ class Plotter(dspy.Signature):
         - For the position of the vertical axis, the x in transform(x,y) should be bigger to leave enough space for the axis labels to be position within the container
     7. For the large numbers in the axis labels, render in SI Prefixes (K, M, etc).
     8. You must include a title for the visualization
+    9. We are using dark theme, so keep the text, axis labels, ticks, etc. in white color so that they are visible
 
     # Color Palette
     #0CFCDD #46E4FD #3C93FD #2669FC #7667E6

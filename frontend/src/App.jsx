@@ -267,6 +267,8 @@ function App() {
                 const vizId = `viz-${vizPath.replace(/[^a-zA-Z0-9]/g, "-")}`;
                 const vizSelector = `#${vizId} .visualization-container`;
                 console.log("hello")
+                console.log("vizSelector", vizSelector);
+                console.log("displayName", displayName);
                 const filePath = await downloadVisualizationImage(vizSelector, displayName);
                 console.log("filePath returned by downloadVisualizationImage", filePath);
                 filePathList.push(filePath);
@@ -814,10 +816,13 @@ function App() {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-[#12121A]">
         <div className="text-center">
-          <h1 className="text-2xl text-white mb-6">Welcome to Data Visualization App</h1>
+          <div className="flex justify-center mb-6">
+            <img src="/logo.png" alt="Visualyze Logo" className="w-24 h-24" />
+          </div>
+          <h1 className="text-2xl text-white mb-6">Welcome to Visualyze</h1>
           <button
             onClick={login}
-            className="px-6 py-3 bg-[#D4A017] text-white rounded-lg hover:bg-[#B38A14] transition-colors"
+            className="px-6 py-3 bg-[#3C93FD] text-white rounded-lg hover:bg-[#2669FF] transition-colors"
           >
             Start
           </button>
