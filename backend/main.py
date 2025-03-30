@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import logging
@@ -19,6 +19,7 @@ import uuid
 from datetime import datetime
 import shutil
 from dotenv import load_dotenv
+from backend.endpoints.image_handler import router as image_router
 
 load_dotenv()
 
@@ -289,23 +290,19 @@ async def list_template_visualizations():
 
 ## MAIN FUNCTION
 
-@app.post("/api/process-prompt", response_model=Dict[str, Any])
-async def process_prompt(data: Dict[str, Any] = Body(...)):
+# Endpoint for generating visualizations
+async def generate_visualization(data):
     """
-    Process a user prompt through the AI agent.
+    Generate visualizations based on user prompt and input files.
     
-    For now, this is a mock implementation that:
-    1. Takes the user prompt
-    2. Selects a visualization template from samples
-    3. Customizes it slightly
-    4. Saves it as a new visualization in the user's directory
-    5. Returns the filename to the frontend
+    Takes the user prompt and file paths, generates visualizations,
+    and returns paths to the created files.
     """
+    print("visualization-data:", data)
     try:
         prompt = data.get("prompt")
-        conversation_id = data.get("conversationId")
-        node_id = data.get("nodeId")
         wallet_address = data.get("walletAddress")
+        file_paths = data.get("filePaths", [])
         
         if not prompt:
             raise HTTPException(status_code=400, detail="Missing prompt")
@@ -313,17 +310,27 @@ async def process_prompt(data: Dict[str, Any] = Body(...)):
         if not wallet_address:
             raise HTTPException(status_code=400, detail="Missing wallet address")
             
-        logger.info(f"Processing prompt for wallet {wallet_address}: {prompt[:50]}...")
+        logger.info(f"Generating visualization for wallet {wallet_address}: {prompt[:50]}...")
+        
+        # Save the prompt to the backend/data/prompts.txt
+        with open("backend/data/prompts.txt", "a", encoding="utf-8") as f:
+            f.write(f"{datetime.now()} [VIZ]: {prompt}\n")
         
         # Get or create user directory
         user_viz_dir = get_user_visualization_dir(wallet_address)
         
-        # TODO: change this to actual
+        print("prompt:", prompt)
+        print("file_paths:", file_paths)
+        
+        # Generate visualization results
+        results = prompt_agent(prompt, csv_dir=DATA_DIR, viz_dir=user_viz_dir, attachments=file_paths)
         # results = temp_mock_agent(prompt, csv_dir=DATA_DIR, viz_dir=user_viz_dir)
-        results = prompt_agent(prompt, csv_dir=DATA_DIR, viz_dir=user_viz_dir)
         
-        print("results", results)
+        print("visualization results:", results)
         
+        if not isinstance(results, list):
+            raise HTTPException(status_code=500, detail="Expected list result from visualization generation")
+            
         # Get the sanitized wallet address for the response
         sanitized_address = wallet_address.replace('0x', '').lower()
         
@@ -334,30 +341,167 @@ async def process_prompt(data: Dict[str, Any] = Body(...)):
                 filenames.append(f"{sanitized_address}/{r['file_name']}.js")
                 logger.info(f"Created new visualization file for user {wallet_address}: {r['file_name']}")
                 
-                
-                # copy the newly generated csv files from DATA_DIR to TARGET_DATA_DIR
                 # Copy the corresponding CSV file to the target directory
                 base_name = r['file_name']
                 csv_filename = f"{base_name}.csv"
                 csv_source_path = os.path.join(DATA_DIR, csv_filename)
                 csv_dest_path = os.path.join(TARGET_DATA_DIR, csv_filename)
                 shutil.copy2(csv_source_path, csv_dest_path)
-                
-                # TODO: what to do with AI response??
-                # Update the conversation in chat history if IDs were provided
-                # if conversation_id and node_id:
-                #     ai_response = f"I've created a visualization based on your prompt. You can view it by clicking on '{r['file_name']}' in the file explorer."
-                #     update_node_with_ai_response(conversation_id, node_id, ai_response)
-                #     logger.info(f"Updated conversation node with AI response")
-                
+            
         return {
             "success": True,
             "message": "Visualization generated successfully",
             "filenames": filenames  # Return paths with wallet address
         }
     except Exception as e:
+        logger.error(f"Error generating visualization: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Endpoint for data analysis
+async def analyze_data(data):
+    """
+    Process a user prompt through the AI agent for data analysis.
+    
+    Takes the user prompt and file paths, performs analysis,
+    and returns textual analysis results.
+    """
+    print("analysis-data:", data)
+    try:
+        wallet_address = data.get("walletAddress")
+        file_paths = data.get("filePaths", [])
+        
+        if not wallet_address:
+            raise HTTPException(status_code=400, detail="Missing wallet address")
+            
+        
+        # Get the prompt from the backend/data/prompts.txt
+        with open("backend/data/prompts.txt", "r", encoding="utf-8") as f:
+            prompt = f.readlines()[-1].split(": ")[1].strip()
+        
+        print("prompt:", prompt)
+        print("file_paths:", file_paths)
+        
+        logger.info(f"Analyzing data for wallet {wallet_address}: {prompt[:50]}...")
+        
+        # Analyze data
+        if file_paths:
+            # Use provided files for analysis
+            results = prompt_agent(prompt, csv_dir="", viz_dir="", attachments=file_paths)
+        else:
+            results = {"success": False, "message": "No files provided for analysis", "analysis": "No analysis performed"}
+        
+        print("analysis results:", results)
+        
+        if isinstance(results, str):
+            # Analysis produced textual results
+            return {
+                "success": True,
+                "message": "Analysis generated successfully",
+                "analysis": results
+            }
+        else:
+            # Unexpected result format
+            raise HTTPException(status_code=500, detail="Expected string result from data analysis")
+            
+    except Exception as e:
+        logger.error(f"Error analyzing data: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# FastAPI route definitions
+# @app.post("/api/generate-visualization")
+# async def generate_visualization_endpoint(request: Request):
+#     data = await request.json()
+#     return await generate_visualization(data)
+
+@app.post("/api/analyze-data")
+async def analyze_data_endpoint(request: Request):
+    data = await request.json()
+    return await analyze_data(data)
+
+# Keep the original endpoint for backward compatibility
+@app.post("/api/process-prompt")
+async def process_prompt_endpoint(request: Request):
+    data = await request.json()
+    return await process_prompt(data)
+
+# Original function (you can eventually deprecate this)
+async def process_prompt(data):
+    """
+    Process a user prompt through the AI agent.
+    
+    This is the original implementation that handles both visualization and analysis.
+    Consider using the dedicated endpoints instead.
+    """
+    print("data-first", data)
+    try:
+        prompt = data.get("prompt")
+        conversation_id = data.get("conversationId")
+        node_id = data.get("nodeId")
+        wallet_address = data.get("walletAddress")
+        
+        if not prompt:
+            raise HTTPException(status_code=400, detail="Missing prompt")
+        
+        # Save the prompt to the backend/data/prompts.txt
+        with open("backend/data/prompts.txt", "a", encoding="utf-8") as f:
+            f.write(f"{datetime.now()}: {prompt}\n")
+        
+        if not wallet_address:
+            raise HTTPException(status_code=400, detail="Missing wallet address")
+            
+        logger.info(f"Processing prompt for wallet {wallet_address}: {prompt[:50]}...")
+        
+        # Get or create user directory
+        user_viz_dir = get_user_visualization_dir(wallet_address)
+        
+        print("prompt", prompt)
+        print("data", data)
+    
+        # results = temp_mock_agent(prompt, csv_dir=DATA_DIR, viz_dir=user_viz_dir)
+        results = prompt_agent(prompt, csv_dir=DATA_DIR, viz_dir=user_viz_dir)
+        
+        print("results", results)
+        
+        if type(results) == list:
+            # Get the sanitized wallet address for the response
+            sanitized_address = wallet_address.replace('0x', '').lower()
+            
+            filenames = []
+            
+            for r in results:
+                if r['result'] == "success":
+                    filenames.append(f"{sanitized_address}/{r['file_name']}.js")
+                    logger.info(f"Created new visualization file for user {wallet_address}: {r['file_name']}")
+                    
+                    # copy the newly generated csv files from DATA_DIR to TARGET_DATA_DIR
+                    # Copy the corresponding CSV file to the target directory
+                    base_name = r['file_name']
+                    csv_filename = f"{base_name}.csv"
+                    csv_source_path = os.path.join(DATA_DIR, csv_filename)
+                    csv_dest_path = os.path.join(TARGET_DATA_DIR, csv_filename)
+                    shutil.copy2(csv_source_path, csv_dest_path)
+                
+            return {
+                "success": True,
+                "message": "Visualization generated successfully",
+                "filenames": filenames  # Return paths with wallet address
+            }
+        
+        elif type(results) == str:
+            return {
+                "success": True,
+                "message": "Analysis generated successfully",
+                "analysis": results
+            }
+        
+        else:
+            raise HTTPException(status_code=500, detail="Error processing prompt")
+    except Exception as e:
         logger.error(f"Error processing prompt: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# Then in your app definition, include the router
+app.include_router(image_router, prefix="/api", tags=["images"])
 
 if __name__ == "__main__":
     import uvicorn
