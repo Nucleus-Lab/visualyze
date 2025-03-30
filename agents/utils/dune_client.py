@@ -162,7 +162,7 @@ class DuneQueryClient:
     ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, str]]:
         """执行查询并获取结果"""
         try:
-            results_df = self.client.run_query_dataframe(query=query)
+            results_df = self.client.run_query_dataframe(query=query, performance='medium')
             logger.info(f"查询执行成功，返回{len(results_df)}行结果")
             logger.info(f"results_df: {type(results_df)}")
             logger.info(results_df)
