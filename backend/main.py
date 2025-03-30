@@ -33,40 +33,219 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Define base visualization directory and user-specific paths
 VISUALIZATIONS_DIR = "../frontend/src/components/visualizations"
+TEMPLATES_DIR = os.path.join(VISUALIZATIONS_DIR, "templates")
+os.makedirs(VISUALIZATIONS_DIR, exist_ok=True)
+os.makedirs(TEMPLATES_DIR, exist_ok=True)
+
+# Helper function to get or create user directory
+def get_user_dir(wallet_address):
+    """Create a user-specific directory based on wallet address and return the path"""
+    # Sanitize wallet address for use as directory name
+    sanitized_address = wallet_address.replace('0x', '').lower()
+    
+    # Create user directory
+    user_dir = os.path.join(VISUALIZATIONS_DIR, sanitized_address)
+    os.makedirs(user_dir, exist_ok=True)
+    
+    logger.info(f"Using user directory: {user_dir}")
+    return user_dir
+
+# Copy sample templates to templates directory if it's empty
+def ensure_template_files_exist():
+    """Ensure that at least one template file exists in the templates directory"""
+    if not os.path.exists(TEMPLATES_DIR):
+        os.makedirs(TEMPLATES_DIR, exist_ok=True)
+        
+    # Check if templates directory is empty
+    template_files = [f for f in os.listdir(TEMPLATES_DIR) if f.endswith('.js')]
+    if not template_files:
+        logger.info("No template files found. Creating sample templates...")
+        
+        # Create a simple template visualization
+        sample_template = """
+// Sample Visualization Template
+const GeneratedViz = () => {
+  // Set up dimensions
+  const width = 800;
+  const height = 400;
+  const margin = { top: 50, right: 50, bottom: 70, left: 80 };
+  const titleText = "Web3 DeFi Transactions Over Time";
+  
+  // Set up the D3 visualization
+  React.useEffect(() => {
+    // Clear previous SVG
+    d3.select("#chart").selectAll("*").remove();
+    
+    // Create the SVG
+    const svg = d3.select("#chart")
+      .append("svg")
+      .attr("width", width)
+      .attr("height", height)
+      .append("g")
+      .attr("transform", `translate(${margin.left}, ${margin.top})`);
+    
+    // Generate some sample data
+    const data = Array.from({ length: 20 }, (_, i) => ({
+      date: new Date(2023, 0, i + 1),
+      value: Math.random() * 1000
+    }));
+    
+    // Create scales
+    const xScale = d3.scaleTime()
+      .domain(d3.extent(data, d => d.date))
+      .range([0, width - margin.left - margin.right]);
+    
+    const yScale = d3.scaleLinear()
+      .domain([0, d3.max(data, d => d.value)])
+      .range([height - margin.top - margin.bottom, 0]);
+    
+    // Add X-axis
+    svg.append("g")
+      .attr("transform", `translate(0, ${height - margin.top - margin.bottom})`)
+      .call(d3.axisBottom(xScale))
+      .selectAll("text")
+      .style("text-anchor", "end")
+      .attr("dx", "-.8em")
+      .attr("dy", ".15em")
+      .attr("transform", "rotate(-45)");
+    
+    // Add Y-axis
+    svg.append("g")
+      .call(d3.axisLeft(yScale));
+    
+    // Add X-axis label
+    svg.append("text")
+      .attr("x", (width - margin.left - margin.right) / 2)
+      .attr("y", height - margin.top - margin.bottom + 50)
+      .style("text-anchor", "middle")
+      .text("Date");
+    
+    // Add Y-axis label
+    svg.append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("x", -(height - margin.top - margin.bottom) / 2)
+      .attr("y", -60)
+      .style("text-anchor", "middle")
+      .text("Transaction Volume");
+    
+    // Add title
+    svg.append("text")
+      .attr("x", (width - margin.left - margin.right) / 2)
+      .attr("y", -20)
+      .style("text-anchor", "middle")
+      .style("font-size", "18px")
+      .text(titleText);
+    
+    // Create line generator
+    const line = d3.line()
+      .x(d => xScale(d.date))
+      .y(d => yScale(d.value))
+      .curve(d3.curveMonotoneX);
+    
+    // Add the line
+    svg.append("path")
+      .datum(data)
+      .attr("fill", "none")
+      .attr("stroke", "#46E4FD")
+      .attr("stroke-width", 2)
+      .attr("d", line);
+    
+    // Add circles for data points
+    svg.selectAll(".dot")
+      .data(data)
+      .enter()
+      .append("circle")
+      .attr("cx", d => xScale(d.date))
+      .attr("cy", d => yScale(d.value))
+      .attr("r", 5)
+      .attr("fill", "#D4A017");
+    
+  }, []);
+  
+  return (
+    <div id="chart" className="w-full h-full"></div>
+  );
+};
+"""
+        
+        # Save the sample template
+        with open(os.path.join(TEMPLATES_DIR, "sample_template.js"), "w", encoding="utf-8") as f:
+            f.write(sample_template)
+            
+        logger.info("Created sample template visualization")
+
+# Ensure templates exist at application startup
+ensure_template_files_exist()
 
 @app.get("/api/visualizations")
 async def list_visualizations():
+    """List all visualization files available in the visualizations directory."""
     try:
-        logger.info("Fetching list of visualization files")
-        if not os.path.exists(VISUALIZATIONS_DIR):
-            logger.error(f"Visualizations directory not found: {VISUALIZATIONS_DIR}")
-            raise HTTPException(status_code=404, detail="Visualizations directory not found")
+        logger.info("Fetching list of all visualization files")
         
-        files = [f for f in os.listdir(VISUALIZATIONS_DIR) if f.endswith('.js')]
-        logger.info(f"Found {len(files)} visualization files")
-        return {"files": files}
+        # Get all files from all user directories
+        all_files = []
+        for root, dirs, files in os.walk(VISUALIZATIONS_DIR):
+            for file in files:
+                if file.endswith('.js'):
+                    # Get relative path from VISUALIZATIONS_DIR
+                    rel_path = os.path.relpath(os.path.join(root, file), VISUALIZATIONS_DIR)
+                    all_files.append(rel_path)
+        
+        logger.info(f"Found {len(all_files)} visualization files")
+        return {"files": all_files}
     except Exception as e:
         logger.error(f"Error listing visualizations: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/visualizations/{filename}")
-async def get_visualization(filename: str):
+@app.get("/api/visualizations/{wallet_address}")
+async def list_user_visualizations(wallet_address: str):
+    """List visualization files for a specific user."""
     try:
-        logger.info(f"Fetching visualization file: {filename}")
-        file_path = os.path.join(VISUALIZATIONS_DIR, filename)
+        logger.info(f"Fetching visualizations for user: {wallet_address}")
         
-        if not os.path.exists(file_path):
-            logger.error(f"File not found: {file_path}")
-            raise HTTPException(status_code=404, detail="File not found")
+        # Get or create user directory
+        user_dir = get_user_dir(wallet_address)
         
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+        # Get user-specific visualization files
+        user_files = []
+        if os.path.exists(user_dir):
+            user_files = [f for f in os.listdir(user_dir) if f.endswith('.js')]
         
-        logger.info(f"Successfully read file: {filename}")
-        return {"content": content}
+        logger.info(f"Found {len(user_files)} visualization files for user {wallet_address}")
+        return {"files": user_files}
     except Exception as e:
-        logger.error(f"Error reading visualization file: {str(e)}")
+        logger.error(f"Error listing user visualizations: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/visualizations/{file_path:path}")
+async def get_visualization(file_path: str):
+    """Get a specific visualization file by path."""
+    try:
+        logger.info(f"Fetching visualization file: {file_path}")
+        
+        # Build the full path
+        full_path = os.path.join(VISUALIZATIONS_DIR, file_path)
+        
+        # Ensure the file exists
+        if not os.path.exists(full_path) or not os.path.isfile(full_path):
+            logger.error(f"Visualization file not found: {full_path}")
+            raise HTTPException(status_code=404, detail=f"Visualization file not found: {file_path}")
+        
+        # Read the file
+        with open(full_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        logger.info(f"Successfully retrieved visualization file: {file_path}")
+        return {
+            "content": content
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving visualization file: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/conversations")
@@ -203,7 +382,24 @@ async def get_node_branch(conversation_id: str, node_id: str):
         logger.error(f"Error getting branch: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/process-prompt")
+@app.get("/api/visualizations/templates")
+async def list_template_visualizations():
+    """List all template visualization files available."""
+    try:
+        logger.info("Fetching list of template visualization files")
+        
+        # Get template visualization files
+        template_files = []
+        if os.path.exists(TEMPLATES_DIR):
+            template_files = [f for f in os.listdir(TEMPLATES_DIR) if f.endswith('.js')]
+        
+        logger.info(f"Found {len(template_files)} template visualization files")
+        return {"files": template_files}
+    except Exception as e:
+        logger.error(f"Error listing template visualizations: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/process-prompt", response_model=Dict[str, Any])
 async def process_prompt(data: Dict[str, Any] = Body(...)):
     """
     Process a user prompt through the AI agent.
@@ -212,29 +408,38 @@ async def process_prompt(data: Dict[str, Any] = Body(...)):
     1. Takes the user prompt
     2. Selects a visualization template from samples
     3. Customizes it slightly
-    4. Saves it as a new visualization
+    4. Saves it as a new visualization in the user's directory
     5. Returns the filename to the frontend
     """
     try:
         prompt = data.get("prompt")
         conversation_id = data.get("conversationId")
         node_id = data.get("nodeId")
+        wallet_address = data.get("walletAddress")
         
         if not prompt:
             raise HTTPException(status_code=400, detail="Missing prompt")
+        
+        if not wallet_address:
+            raise HTTPException(status_code=400, detail="Missing wallet address")
             
-        logger.info(f"Processing prompt: {prompt[:50]}...")
+        logger.info(f"Processing prompt for wallet {wallet_address}: {prompt[:50]}...")
         
-        # TODO: In a real implementation, this would call the AI agent in ai-agent/
-        # For now, we'll mock it by copying and modifying an existing visualization
+        # Get or create user directory
+        user_dir = get_user_dir(wallet_address)
         
-        # 1. Select a template file (randomly choose between existing visualizations)
-        template_files = [f for f in os.listdir(VISUALIZATIONS_DIR) if f.endswith('.js')]
+        # 1. Select a template file from templates directory
+        template_files = [f for f in os.listdir(TEMPLATES_DIR) if f.endswith('.js')]
+        if not template_files:
+            # Ensure we have template files
+            ensure_template_files_exist()
+            template_files = [f for f in os.listdir(TEMPLATES_DIR) if f.endswith('.js')]
+            
         if not template_files:
             raise HTTPException(status_code=500, detail="No template visualizations available")
             
         template_file = random.choice(template_files)
-        template_path = os.path.join(VISUALIZATIONS_DIR, template_file)
+        template_path = os.path.join(TEMPLATES_DIR, template_file)
         
         # 2. Read the template
         with open(template_path, 'r', encoding='utf-8') as f:
@@ -257,12 +462,12 @@ async def process_prompt(data: Dict[str, Any] = Body(...)):
             f"\"{prompt[:30]}...\""
         )
         
-        # 4. Save the new visualization file
-        new_file_path = os.path.join(VISUALIZATIONS_DIR, new_filename)
+        # 4. Save the new visualization file in the user's directory
+        new_file_path = os.path.join(user_dir, new_filename)
         with open(new_file_path, 'w', encoding='utf-8') as f:
             f.write(modified_code)
             
-        logger.info(f"Created new visualization file: {new_filename}")
+        logger.info(f"Created new visualization file for user {wallet_address}: {new_filename}")
         
         # 5. Update the conversation in chat history if IDs were provided
         if conversation_id and node_id:
@@ -270,10 +475,13 @@ async def process_prompt(data: Dict[str, Any] = Body(...)):
             update_node_with_ai_response(conversation_id, node_id, ai_response)
             logger.info(f"Updated conversation node with AI response")
         
+        # Get the sanitized wallet address for the response
+        sanitized_address = wallet_address.replace('0x', '').lower()
+        
         return {
             "success": True,
             "message": "Visualization generated successfully",
-            "filename": new_filename
+            "filename": f"{sanitized_address}/{new_filename}"  # Return path with wallet address
         }
     except Exception as e:
         logger.error(f"Error processing prompt: {str(e)}")

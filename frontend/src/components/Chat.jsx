@@ -11,7 +11,8 @@ const Chat = forwardRef(({
   messages: externalMessages,
   setMessages: setExternalMessages,
   refreshFileExplorer,
-  collapseChat
+  collapseChat,
+  handleChatMessage
 }, ref) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
@@ -100,62 +101,82 @@ const Chat = forwardRef(({
         userNodeId = userNode.id;
       }
 
-      // Call the AI processing endpoint
-      const response = await fetch('http://localhost:8000/api/process-prompt', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: userInput,
-          conversationId: activeConversationId,
-          nodeId: userNodeId
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.detail || 'Failed to process prompt');
-      }
-      
-      // Remove the loading message
-      setExternalMessages(prev => prev.filter(msg => msg !== loadingMessage));
-      
-      // Show typing animation
-      setIsTypingResponse(true);
-      
-      // Add AI response to UI with the generated visualization info
-      const aiResponseText = `I've created a visualization based on your prompt. The visualization '${data.filename}' has been added to the canvas. You can interact with it alongside any existing visualizations.`;
-      
-      // Simulate typing delay for better UX
-      setTimeout(() => {
-        const aiMessage = {
-          text: aiResponseText,
-          sender: 'ai',
-          timestamp: new Date().toISOString(),
-        };
-  
-        setExternalMessages(prev => [...prev, aiMessage]);
-        setIsTypingResponse(false);
+      // Use the handleChatMessage function from App.jsx if provided
+      if (handleChatMessage) {
+        const data = await handleChatMessage(userInput);
         
-      }, 500);
-      
-      // No need to update the node with AI response as it's already done by the backend
+        // Remove the loading message
+        setExternalMessages(prev => prev.filter(msg => msg !== loadingMessage));
+        
+        // Show typing animation
+        setIsTypingResponse(true);
+        
+        // Add AI response to UI with the generated visualization info
+        const aiResponseText = `I've created a visualization based on your prompt. The visualization '${data.filename.split('/').pop()}' has been added to the canvas. You can interact with it alongside any existing visualizations.`;
+        
+        // Simulate typing delay for better UX
+        setTimeout(() => {
+          const aiMessage = {
+            text: aiResponseText,
+            sender: 'ai',
+            timestamp: new Date().toISOString(),
+          };
+    
+          setExternalMessages(prev => [...prev, aiMessage]);
+          setIsTypingResponse(false);
+          
+        }, 500);
+      } else {
+        // Legacy code path using direct fetch (for backward compatibility)
+        const response = await fetch('http://localhost:8000/api/process-prompt', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: userInput,
+            conversationId: activeConversationId,
+            nodeId: userNodeId
+          }),
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.detail || 'Failed to process prompt');
+        }
+        
+        // Remove the loading message
+        setExternalMessages(prev => prev.filter(msg => msg !== loadingMessage));
+        
+        // Show typing animation
+        setIsTypingResponse(true);
+        
+        // Add AI response to UI with the generated visualization info
+        const aiResponseText = `I've created a visualization based on your prompt. The visualization '${data.filename}' has been added to the canvas. You can interact with it alongside any existing visualizations.`;
+        
+        // Simulate typing delay for better UX
+        setTimeout(() => {
+          const aiMessage = {
+            text: aiResponseText,
+            sender: 'ai',
+            timestamp: new Date().toISOString(),
+          };
+    
+          setExternalMessages(prev => [...prev, aiMessage]);
+          setIsTypingResponse(false);
+          
+        }, 500);
+      }
       
       // Notify parent component about the new message
       if (onMessageSent && activeConversationId) {
         onMessageSent(activeConversationId, { id: userNodeId });
       }
 
-      // Refresh the file explorer to show the new visualization file
-      if (refreshFileExplorer) {
-        console.log("Refreshing file explorer after generating visualization:", data.filename);
-        refreshFileExplorer(data.filename);
-        
-          if (collapseChat) {
-            collapseChat(); // Now this will hide the chat pane completely
-          }
+      // If collapseChat is provided, use it to hide the chat pane
+      if (collapseChat) {
+        collapseChat(); // Will hide the chat pane
       }
     } catch (error) {
       console.error("Error handling chat message:", error);

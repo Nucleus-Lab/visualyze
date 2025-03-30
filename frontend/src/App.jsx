@@ -46,7 +46,7 @@ function App() {
   // Subscription state
   const [hasSubscription, setHasSubscription] = useState(false)
   const [subscriptionExpiry, setSubscriptionExpiry] = useState(null)
-  
+
   // Toast notification state
   const [toast, setToast] = useState(null)
 
@@ -72,25 +72,65 @@ function App() {
   // State to track recently removed visualizations for animation
   const [removedVisualizations, setRemovedVisualizations] = useState([]);
 
+  // Add this effect to clear content when user changes
+  useEffect(() => {
+    if (user?.wallet?.address) {
+      // Clear file explorer and canvas when user changes
+      setFileStructure({ visualizations: {} });
+      setSelectedVisualizations([]);
+      setVisualizationComponents({});
+      console.log("Cleared content for new user:", user.wallet.address);
+    }
+  }, [user?.wallet?.address]); // This will trigger when the wallet address changes
+
   // Function to refresh file explorer when new visualizations are created
   const refreshFileExplorer = async (highlightFile = null) => {
     try {
-      // Fetch visualization files from backend
-      const response = await fetch('http://localhost:8000/api/visualizations')
-      const data = await response.json()
-      
-      // Create file structure and prepare for component loading
+      // Get wallet address
+      const walletAddress = user?.wallet?.address || 'anonymous';
+
+      // Create empty structure first in case fetch fails
       const newFileStructure = {
         visualizations: {}
+      };
+      
+      setFileStructure(newFileStructure);
+    
+      
+      // Only fetch files if we have a wallet address
+      if (walletAddress !== 'anonymous') {
+        // Fetch user-specific visualization files
+        console.log(`Fetching all visualiations for ${walletAddress}`)
+        const userResponse = await fetch(`http://localhost:8000/api/visualizations/${walletAddress}`)
+        const userData = await userResponse.json()
+
+        console.log("userData", userData)
+      
+        // Fetch template visualizations
+        const templatesResponse = await fetch(`http://localhost:8000/api/visualizations/templates`)
+        const templatesData = await templatesResponse.json()
+        
+        // Create file structure and prepare for component loading
+        const newFileStructure = {
+          visualizations: {}
+        }
+        
+        // Add user's visualization files with a prefix to distinguish them
+        userData.files.forEach(fileName => {
+          newFileStructure.visualizations[`(My) ${fileName}`] = null
+        })
+        
+        // Add template visualization files
+        templatesData.files.forEach(fileName => {
+          newFileStructure.visualizations[`(Template) ${fileName}`] = null
+        })
+        
+        setFileStructure(newFileStructure)
+        console.log('Refreshed visualization files:', {
+          user: userData.files,
+          templates: templatesData.files
+        })
       }
-      
-      // Add each visualization file to the structure
-      data.files.forEach(fileName => {
-        newFileStructure.visualizations[fileName] = null
-      })
-      
-      setFileStructure(newFileStructure)
-      console.log('Refreshed visualization files:', data.files)
       
       // Automatically open the file explorer if closed
       if (!isFileExplorerOpen) {
@@ -98,7 +138,23 @@ function App() {
       }
       
       // If a specific file should be highlighted, select it and display it in the canvas
-      if (highlightFile && data.files.includes(highlightFile)) {
+      if (highlightFile) {
+        // Extract the filename from the path if it contains a path
+        const pathParts = highlightFile.split('/');
+        const userAddress = pathParts.length > 1 ? pathParts[0] : '';
+        const fileName = pathParts.length > 1 ? pathParts[1] : pathParts[0];
+        
+        console.log('Highlighting file:', { highlightFile, userAddress, fileName });
+        
+        // Format the display name based on whether it's a user file or template
+        const displayName = userAddress === walletAddress.replace('0x', '').toLowerCase() 
+          ? `(My) ${fileName}` 
+          : userData.files.includes(fileName) 
+            ? `(My) ${fileName}` 
+            : templatesData.files.includes(fileName) 
+              ? `(Template) ${fileName}` 
+              : fileName;
+        
         // Add to selected visualizations if not already included
         if (!selectedVisualizations.includes(highlightFile)) {
           // Always add the new visualization to existing ones, don't replace
@@ -118,19 +174,24 @@ function App() {
       }
     } catch (error) {
       console.error('Error refreshing visualization files:', error)
-      showToast("Failed to refresh file explorer", null)
     }
   }
   
   // Helper function to load a visualization component
-  const loadVisualizationComponent = async (fileName) => {
-    if (!visualizationComponents[fileName]) {
+  const loadVisualizationComponent = async (filePath) => {
+    if (!visualizationComponents[filePath]) {
       try {
+        console.log("Loading visualization:", filePath);
+        
         // Fetch JS code from backend
-        const response = await fetch(`http://localhost:8000/api/visualizations/${fileName}`);
+        const response = await fetch(`http://localhost:8000/api/visualizations/${filePath}`);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to load visualization: ${response.statusText}`);
+        }
+        
         const data = await response.json();
-
-        console.log("Fetched JS Code for:", fileName);
+        console.log("Fetched JS Code length:", data.content.length);
 
         // Dynamically evaluate the JS code received
         const component = new Function("React", "d3", `
@@ -141,12 +202,12 @@ function App() {
         // Store the evaluated component in state
         setVisualizationComponents(prev => ({
           ...prev,
-          [fileName]: component,
+          [filePath]: component,
         }));
 
-        console.log("Loaded Visualization Component:", fileName);
+        console.log("Successfully loaded visualization component:", filePath);
       } catch (error) {
-        console.error("Error loading visualization:", fileName, error);
+        console.error("Error loading visualization:", filePath, error);
       }
     }
   };
@@ -182,7 +243,6 @@ function App() {
         }
       } catch (error) {
         console.error("Error loading chat history:", error);
-        showToast("Failed to load chat history", null);
       } finally {
         setIsLoadingHistory(false);
       }
@@ -217,14 +277,14 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [isChatOpen]);
 
-  // Effect to scan for visualization files
-  useEffect(() => {
-    refreshFileExplorer();
-  }, [])
-
   // Effect to check subscription status when user is authenticated
   useEffect(() => {
     const checkUserSubscription = async () => {
+      // Clear any existing visualizations first
+      setFileStructure({ visualizations: {} });
+      setSelectedVisualizations([]);
+      setVisualizationComponents({});
+      
       if (authenticated && user?.wallet?.address && wallets.length > 0) {
         try {
           console.log("Checking subscription status for user");
@@ -232,6 +292,11 @@ function App() {
           setHasSubscription(subscription.hasSubscription);
           setSubscriptionExpiry(subscription.expiryDate);
           console.log("Subscription status updated:", subscription);
+          
+          // Only refresh files if the user has a subscription
+          if (subscription.hasSubscription) {
+            refreshFileExplorer();
+          }
         } catch (error) {
           console.error('Error checking subscription:', error);
         }
@@ -255,34 +320,60 @@ function App() {
   }, [newestVisualization]);
 
   const handleVisualizationSelect = async (path) => {
-    console.log("Selected visualization:", path);
+    console.log("Selected visualization path:", path);
+    
+    // Extract filename from path
     const fileName = path.split("/").pop();
+    
+    // Determine if this is a user visualization or template based on prefix
+    const isUserViz = fileName.startsWith("(My)");
+    const isTemplateViz = fileName.startsWith("(Template)");
+    
+    // Get the actual filename without prefix
+    const actualFileName = isUserViz || isTemplateViz
+      ? fileName.split(") ")[1] // Remove the prefix
+      : fileName;
+    
+    // Build the correct backend path
+    let backendPath;
+    
+    if (isUserViz) {
+      // User visualization - needs wallet address
+      const walletAddress = user?.wallet?.address || 'anonymous';
+      const sanitizedAddress = walletAddress.replace('0x', '').toLowerCase();
+      backendPath = `${sanitizedAddress}/${actualFileName}`;
+    } else if (isTemplateViz) {
+      // Template visualization
+      backendPath = `templates/${actualFileName}`;
+    } else {
+      // Legacy path handling
+      backendPath = fileName;
+    }
   
-    if (selectedVisualizations.includes(fileName)) {
+    if (selectedVisualizations.includes(backendPath)) {
       // Mark this visualization as removing for animation
-      setRemovingViz(fileName);
+      setRemovingViz(backendPath);
       // Add to removed list to keep it around during animation
-      setRemovedVisualizations(prev => [...prev, fileName]);
+      setRemovedVisualizations(prev => [...prev, backendPath]);
       
       // Deselect visualization
-      setSelectedVisualizations((prev) => prev.filter((viz) => viz !== fileName));
+      setSelectedVisualizations((prev) => prev.filter((viz) => viz !== backendPath));
       setRemovingViz(null);
       
       // Remove from the removed list after animation completes 
-      setRemovedVisualizations(prev => prev.filter(v => v !== fileName));
+      setRemovedVisualizations(prev => prev.filter(v => v !== backendPath));
     } else {
       // Select visualization
-      setSelectedVisualizations((prev) => [...prev, fileName]);
-      setAddingViz(fileName);
+      setSelectedVisualizations((prev) => [...prev, backendPath]);
+      setAddingViz(backendPath);
       
-      // Use the loadVisualizationComponent helper
-      await loadVisualizationComponent(fileName);
+      // Load the visualization component
+      await loadVisualizationComponent(backendPath);
       
       // Clear animation state after animation completes
       setTimeout(() => {
         setAddingViz(null);
       }, 500);
-  
     }
   };
 
@@ -308,8 +399,6 @@ function App() {
       showToast('Subscription successful! You now have access to all premium features.', receipt.hash);
     } catch (error) {
       console.error('Error subscribing:', error);
-      // Show error toast
-      showToast('Subscription failed. Please try again.', null);
     }
   };
 
@@ -344,7 +433,6 @@ function App() {
       
       if (!conversation || !conversation.nodes || conversation.nodes.length === 0) {
         console.error("No conversation found");
-        showToast("Failed to load conversation", null);
         return;
       }
       
@@ -409,7 +497,6 @@ function App() {
       setMessages(messagesFromConversation);
     } catch (error) {
       console.error("Error selecting chat node:", error);
-      showToast("Failed to load conversation", null);
     }
   };
 
@@ -546,6 +633,39 @@ function App() {
     document.documentElement.style.setProperty('--chat-width', `${chatPaneWidth}px`);
   }, [chatPaneWidth]);
 
+  // Handler for the Chat component to send messages to AI
+  const handleChatMessage = async (message) => {
+    try {
+      // Call the AI processing endpoint
+      const response = await fetch('http://localhost:8000/api/process-prompt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: message,
+          conversationId: activeConversationId,
+          nodeId: activeNodeId,
+          walletAddress: user?.wallet?.address || 'anonymous'
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to process prompt');
+      }
+      
+      // Refresh file explorer to show new visualization
+      refreshFileExplorer(data.filename);
+      
+      return data;
+    } catch (error) {
+      console.error("Error processing chat message:", error);
+      throw error;
+    }
+  };
+
   // If Privy is not ready, show loading state
   if (!ready) {
     return (
@@ -579,8 +699,8 @@ function App() {
         {/* Left Pane Content */}
         <div className={`${isFileExplorerOpen ? 'left-pane' : 'w-12'} ${isDragging ? 'dragging' : 'transition-all duration-300'}`} 
              style={{ width: isFileExplorerOpen ? `${leftPaneWidth}px` : '48px' }}>
-          <div className={`h-full flex flex-col ${isFileExplorerOpen ? 'w-full bg-[#22222E]' : 'w-12 bg-[#22222E]'}`}>
-            {isFileExplorerOpen ? (
+        <div className={`h-full flex flex-col ${isFileExplorerOpen ? 'w-full bg-[#22222E]' : 'w-12 bg-[#22222E]'}`}>
+          {isFileExplorerOpen ? (
               // Full Left Pane with Tabs
               <>
                 {/* Tabs Navigation */}
@@ -603,22 +723,22 @@ function App() {
                       History
                     </div>
                   </button>
-                  <button 
-                    onClick={() => setIsFileExplorerOpen(false)}
+                <button 
+                  onClick={() => setIsFileExplorerOpen(false)}
                     className="w-8 flex items-center justify-center text-gray-400 hover:text-white"
-                  >
-                    <FaChevronLeft />
-                  </button>
+                >
+                  <FaChevronLeft />
+                </button>
                 </div>
   
                 {/* Tab Content */}
                 <div className="flex-1 overflow-auto custom-scrollbar">
                   {activeTab === 'files' ? (
                     // File Explorer Content
-                    <div className="p-4">
-                      <FileExplorer 
-                        fileStructure={fileStructure} 
-                        onFileSelect={handleVisualizationSelect}
+                <div className="p-4">
+                  <FileExplorer 
+                    fileStructure={fileStructure} 
+                    onFileSelect={handleVisualizationSelect}
                         activeVisualizations={selectedVisualizations}
                       />
                     </div>
@@ -641,55 +761,55 @@ function App() {
                 </div>
   
                 {/* Bottom Section with Subscription Status */}
-                <div className="border-t border-[#1A1A24] p-4">
-                  <div className="flex flex-col gap-3">
-                    {/* Wallet Address */}
-                    <div className="text-sm text-gray-400 break-all">
-                      {user?.wallet?.address ? 
-                        `${user.wallet.address.slice(0, 6)}...${user.wallet.address.slice(-4)}` : 
-                        'No wallet connected'}
-                    </div>
-                    {/* Subscription Status */}
-                    {hasSubscription ? (
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-sm text-[#D4A017]">
-                          <FaCrown className="w-4 h-4" />
-                          <span>Premium until {subscriptionExpiry?.toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <button
-                          onClick={handleSubscribe}
-                          className="flex items-center justify-center gap-2 px-4 py-2 bg-[#D4A017] text-white rounded-lg hover:bg-[#B38A14] transition-colors text-sm"
-                        >
-                          <FaCrown className="w-4 h-4" />
-                          Subscribe Now
-                        </button>
-                      </div>
-                    )}
-                    {/* Logout Button */}
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center justify-center gap-2 px-4 py-2 bg-[#2D2D3B] text-gray-400 hover:text-white hover:bg-[#3C3C4E] rounded-lg transition-colors text-sm mt-2"
-                    >
-                      <FaSignOutAlt className="w-4 h-4" />
-                      Logout
-                    </button>
+              <div className="border-t border-[#1A1A24] p-4">
+                <div className="flex flex-col gap-3">
+                  {/* Wallet Address */}
+                  <div className="text-sm text-gray-400 break-all">
+                    {user?.wallet?.address ? 
+                      `${user.wallet.address.slice(0, 6)}...${user.wallet.address.slice(-4)}` : 
+                      'No wallet connected'}
                   </div>
+                  {/* Subscription Status */}
+                  {hasSubscription ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm text-[#D4A017]">
+                        <FaCrown className="w-4 h-4" />
+                        <span>Premium until {subscriptionExpiry?.toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={handleSubscribe}
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-[#D4A017] text-white rounded-lg hover:bg-[#B38A14] transition-colors text-sm"
+                      >
+                        <FaCrown className="w-4 h-4" />
+                        Subscribe Now
+                      </button>
+                    </div>
+                  )}
+                  {/* Logout Button */}
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-[#2D2D3B] text-gray-400 hover:text-white hover:bg-[#3C3C4E] rounded-lg transition-colors text-sm mt-2"
+                  >
+                    <FaSignOutAlt className="w-4 h-4" />
+                    Logout
+                  </button>
                 </div>
-              </>
-            ) : (
+              </div>
+            </>
+          ) : (
               // Icon Only View
-              <button
-                onClick={() => setIsFileExplorerOpen(true)}
-                className="w-full flex flex-col items-center py-4"
-              >
+            <button
+              onClick={() => setIsFileExplorerOpen(true)}
+              className="w-full flex flex-col items-center py-4"
+            >
                 <div className="text-white hover:text-[#ABA9BF] transition-colors p-2 rounded flex items-center gap-2" title="Open Explorer (Ctrl+B)">
-                  <FaFolder className="w-6 h-6" />
-                </div>
-              </button>
-            )}
+                <FaFolder className="w-6 h-6" />
+              </div>
+            </button>
+          )}
           </div>
         </div>
         
@@ -717,31 +837,60 @@ function App() {
             : 'grid-cols-1 lg:grid-cols-2'
         } auto-rows-fr ${isVizExpanding ? 'viz-expand' : ''}`}>
           {/* Show both active and removed (animating) visualizations */}
-          {[...selectedVisualizations, ...removedVisualizations.filter(v => !selectedVisualizations.includes(v))].map((viz, index) => {
-            const VisualizationComponent = visualizationComponents[viz]
-            console.log('VisualizationComponent:', VisualizationComponent)
-            const isNewest = viz === newestVisualization;
-            const isRemoving = removingViz === viz;
+          {[...selectedVisualizations, ...removedVisualizations.filter(v => !selectedVisualizations.includes(v))].map((vizPath, index) => {
+            const VisualizationComponent = visualizationComponents[vizPath];
+            console.log('Rendering visualization:', vizPath, 'Component:', !!VisualizationComponent);
+            const isNewest = vizPath === newestVisualization;
+            const isRemoving = removingViz === vizPath;
+            
+            // Get display name for the visualization
+            const getDisplayName = (path) => {
+              if (!path) return "";
+              
+              const parts = path.split('/');
+              if (parts.length > 1) {
+                // Path with user address
+                const fileName = parts[parts.length - 1];
+                const userAddress = parts[0];
+                
+                // Check if this is the current user's visualization
+                const currentWalletAddress = user?.wallet?.address || 'anonymous';
+                const currentUserAddress = currentWalletAddress.replace('0x', '').toLowerCase();
+                
+                if (userAddress === currentUserAddress) {
+                  return `${fileName}`;
+                } else if (userAddress === 'templates') {
+                  return `(Template) ${fileName}`;
+                } else {
+                  return fileName;
+                }
+              } else {
+                // Just a filename
+                return path;
+              }
+            };
+            
+            const displayName = getDisplayName(vizPath);
             
             return VisualizationComponent ? (
               <div 
-                key={viz} // Use viz as key instead of index for proper animation
+                key={vizPath} // Use vizPath as key instead of index for proper animation
                 ref={isNewest ? newestVizRef : null}
                 className={`bg-[#22222E] rounded-lg p-5 text-white flex flex-col ${
                   selectedVisualizations.length === 1 
                     ? 'min-h-[calc(100vh-40px)]' // Fixed height unaffected by chat pane
                     : 'min-h-[450px]'
                 } ${isNewest ? 'viz-highlight newest-viz' : ''} 
-                ${addingViz === viz ? 'visualization-added' : ''} 
+                ${addingViz === vizPath ? 'visualization-added' : ''} 
                 ${isRemoving ? 'visualization-removed' : ''} 
                 new-viz-enter new-viz-enter-active relative z-10`}
               >
-                {/* Visualization title showing the filename */}
+                {/* Visualization title showing the displayName */}
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="text-sm font-medium text-gray-400 truncate">
-                    {viz}
+                    {displayName}
                   </h3>
-                  {viz === newestVisualization && (
+                  {vizPath === newestVisualization && (
                     <span className="text-xs bg-accent2 text-[#22222E] px-2 py-0.5 rounded-full animate-pulse">
                       New
                     </span>
@@ -759,7 +908,7 @@ function App() {
                   ? 'min-h-[calc(100vh-40px)]' // Fixed height unaffected by chat pane
                   : 'min-h-[400px]'
               }`}>
-                Loading visualization...
+                Loading visualization: {displayName}...
               </div>
             )
           })}
@@ -794,20 +943,20 @@ function App() {
           <div className="w-8 h-1 bg-[#1A1A24] rounded-full group-hover:bg-[#D4A017]"></div>
         </div>
         
-        <button
-          onClick={() => setIsChatOpen(!isChatOpen)}
+          <button
+            onClick={() => setIsChatOpen(!isChatOpen)}
           className={`w-full flex items-center justify-between px-4 py-2 bg-[#2D2D3B] rounded-t-lg text-white hover:bg-[#3C3C4E] transition-colors border-b border-[#1A1A24] ${
             !isChatOpen && 'hidden'
           }`}
-        >
-          <div className="flex items-center gap-2">
-            <FaComments className="w-4 h-4" />
-            <span className="font-mono text-sm">AI Terminal (Ctrl+I)</span>
-          </div>
-          {isChatOpen ? <FaChevronDown /> : <FaChevronUp />}
-        </button>
-        {isChatOpen && (
-          <div className="h-[calc(300px-48px)]">
+          >
+            <div className="flex items-center gap-2">
+              <FaComments className="w-4 h-4" />
+              <span className="font-mono text-sm">AI Terminal (Ctrl+I)</span>
+            </div>
+            {isChatOpen ? <FaChevronDown /> : <FaChevronUp />}
+          </button>
+          {isChatOpen && (
+            <div className="h-[calc(300px-48px)]">
             <Chat 
               ref={chatComponentRef}
               hasSubscription={hasSubscription} 
@@ -819,9 +968,10 @@ function App() {
               setMessages={setMessages}
               refreshFileExplorer={refreshFileExplorer}
               collapseChat={collapseChat}
+              handleChatMessage={handleChatMessage}
             />
-          </div>
-        )}
+            </div>
+          )}
       </div>
 
       {/* Toast Notification */}
