@@ -46,10 +46,9 @@ class Plotter(dspy.Signature):
     ```
     5. Must useRef for the ResizeObserver to work
     ```javascript
-    const chartRef = React.useRef(null);
-
-    React.useEffect(() => {
-      ...
+    const resizeObserver = new ResizeObserver(() => { renderChart(); });
+    resizeObserver.observe(chartRef.current);
+    return () => { resizeObserver.disconnect(); };
     ```
     6. The function must be named GeneratedViz
     """
@@ -74,10 +73,16 @@ class CodeRefiner(dspy.Signature):
     # Guidelines:
     1. Fix the bugs in the d3js code.
     2. Do not return jsx element, use this method:   return React.createElement("div", { ref: chartRef, className: "w-full h-full bg-[#22222E]" });
-    3. Do not overlap the elements, such as the axis labels and ticks
+    3. Put your rendering logic in a function and use a resize observer to call the rendering function so that the graph adjust dynamically based on the container size
+    ```javascript
+    const resizeObserver = new ResizeObserver(() => { renderChart(); });
+    resizeObserver.observe(chartRef.current);
+    return () => { resizeObserver.disconnect(); };
+    ```
+    4. Do not overlap the elements, such as the axis labels and ticks
         - For the vertical axis, put the axis labels at top of the vertical axis, and
         - For the horizontal axis, put the axis labels at right of the horizontal axis
-    4. Directly return the d3js code without including ```javascript```
+    5. Directly return the d3js code without including ```javascript```
     """
 
     prompt = dspy.InputField(prefix="User's prompt:")
