@@ -8,7 +8,7 @@ from agents.utils.dune_client import DuneQueryClient
 from agents.planner import Planner
 from agents.plotter import PlotterAgent
 import concurrent.futures
-from figure_analyzer import AnalyzeFigureAgent
+from agents.figure_analyzer import AnalyzeFigureAgent
 
 dspy.disable_litellm_logging()
 dspy.disable_logging()

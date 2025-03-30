@@ -17,6 +17,10 @@ from agents.main import main as prompt_agent
 from agents.temp.temp_agent import temp_mock_agent
 import uuid
 from datetime import datetime
+import shutil
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -40,7 +44,8 @@ TEMPLATES_DIR = os.path.join(VISUALIZATIONS_DIR, "templates")
 os.makedirs(VISUALIZATIONS_DIR, exist_ok=True)
 os.makedirs(TEMPLATES_DIR, exist_ok=True)
 
-DATA_DIR = "frontend/public/data"
+DATA_DIR = "agents/data"
+TARGET_DATA_DIR = "frontend/public/data"
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Helper function to get or create user directory
@@ -325,17 +330,25 @@ async def process_prompt(data: Dict[str, Any] = Body(...)):
         
         for r in results:
             if r['result'] == "success":
-                filenames.append(f"{sanitized_address}/{r['file_name']}")
+                filenames.append(f"{sanitized_address}/{r['file_name']}.js")
                 logger.info(f"Created new visualization file for user {wallet_address}: {r['file_name']}")
+                
+                
+                # copy the newly generated csv files from DATA_DIR to TARGET_DATA_DIR
+                # Copy the corresponding CSV file to the target directory
+                base_name = r['file_name']
+                csv_filename = f"{base_name}.csv"
+                csv_source_path = os.path.join(DATA_DIR, csv_filename)
+                csv_dest_path = os.path.join(TARGET_DATA_DIR, csv_filename)
+                shutil.copy2(csv_source_path, csv_dest_path)
+                
                 # TODO: what to do with AI response??
                 # Update the conversation in chat history if IDs were provided
                 # if conversation_id and node_id:
                 #     ai_response = f"I've created a visualization based on your prompt. You can view it by clicking on '{r['file_name']}' in the file explorer."
                 #     update_node_with_ai_response(conversation_id, node_id, ai_response)
                 #     logger.info(f"Updated conversation node with AI response")
-                        
-        
-        
+                
         return {
             "success": True,
             "message": "Visualization generated successfully",

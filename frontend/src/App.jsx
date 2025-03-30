@@ -74,13 +74,35 @@ function App() {
   const [removedVisualizations, setRemovedVisualizations] = useState([]);
 
   // Helper function to load a visualization component - moved inside the component
-  const loadVisualizationComponent = useCallback(async (filePath) => {
+  const loadVisualizationComponent = useCallback(async (filePath, retries = 3, delay = 500) => {
     if (!visualizationComponents[filePath]) {
       try {
         console.log("Loading visualization:", filePath);
         
-        // Fetch JS code from backend
-        const response = await fetch(`http://localhost:8000/api/visualizations/${filePath}`);
+        let response;
+        let retryCount = 0;
+        
+        // Try multiple times with increasing delays
+        while (retryCount <= retries) {
+          try {
+            response = await fetch(`http://localhost:8000/api/visualizations/${filePath}`);
+            
+            if (response.ok) {
+              break; // Success, exit the retry loop
+            } else {
+              console.log(`Attempt ${retryCount+1}/${retries+1} failed, retrying in ${delay}ms...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              retryCount++;
+              delay *= 1.5; // Increase delay for next retry
+            }
+          } catch (fetchError) {
+            console.error("Fetch error:", fetchError);
+            if (retryCount >= retries) throw fetchError;
+            retryCount++;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 1.5;
+          }
+        }
         
         if (!response.ok) {
           throw new Error(`Failed to load visualization: ${response.statusText}`);
@@ -323,7 +345,7 @@ function App() {
     
     // Extract filename from path
     const fileName = path.split("/").pop();
-    
+  
     // Determine if this is a user visualization or template based on prefix
     const isUserViz = fileName.startsWith("(My)");
     const isTemplateViz = fileName.startsWith("(Template)");
