@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import SubscriptionNFT from '../../../hardhat/artifacts/contracts/SubscriptionNFT.sol/SubscriptionNFT.json';
+import SubscriptionNFT from '/abi/SubscriptionNFT.json';
 
 // Contract address - replace with your deployed contract address
 const CONTRACT_ADDRESS = "0xD63878fcE308FDc2864B296334d96403910EDb77";
