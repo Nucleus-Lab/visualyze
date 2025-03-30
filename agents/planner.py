@@ -22,6 +22,8 @@ class Planner:
         reasoning = response.reasoning
         tasks = response.tasks
         print(f"Reasoning: {reasoning}")
-        print(f"The list of tasks: {tasks}")
+        print(f"The list of tasks:")
+        for idx, task in enumerate(tasks):
+            print(f"  {idx}. {task}")
 
         return tasks

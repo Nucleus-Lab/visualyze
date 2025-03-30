@@ -27,36 +27,39 @@ class TableRetriever(dspy.Signature):
 
 class SqlGenerator(dspy.Signature):
     """Given user's prompt, generate Trino SQL query, directly return the Trino SQL query without including ```sql```.
-    The retrieved table will be saved as a csv file, output the appropriate filename based on the user's prompt, for example: 0x5e89f8d81c74e311458277ea1be3d3247c7cd7d1_1inch_txs_results.csv
+    The retrieved table will be saved as a csv file, output the appropriate filename based on the user's prompt.
+
+    # Guideline
+    1. Output filename should be short and represent the generated query
     """
 
     prompt: str = dspy.InputField(prefix="User's prompt:")
-    most_relevant_table: Table = dspy.InputField(prefix="The most relevant table:")
+    most_relevant_table: FullTable = dspy.InputField(prefix="The most relevant table:")
     trino_sql_query: str = dspy.OutputField(prefix="The generated Trino SQL query:")
     output_filename: str = dspy.OutputField(prefix="The appropriate filename:")
 
 
 class SqlOptimizer(dspy.Signature):
-    """I want to query blockchain data for a specific analytical purpose, but I’d like to **minimize resource usage and avoid unnecessary data overhead**.
+    """
+    Given a Trino SQL query, optimize it to minimize resource usage and avoid unnecessary data overhead.
 
-    Write an **efficient and optimized TrinoSQL query** that follows these principles:
-
-    - Avoid full table scans or returning large raw datasets
-    - Only select required fields explicitly (no SELECT *)
-    - Limit the time range using `block_time` or similar timestamp fields
-    - Reduce data granularity where possible (e.g. daily/hourly aggregation instead of per-event data)
-    - Use Trino-supported window functions (e.g., ROW_NUMBER, RANK) or aggregations (e.g., MIN, MAX, AVG) to reduce data volume
-    - Use `WHERE` clauses to filter early and reduce scanned rows (pushdown filters)
-    - Prefer filtering on indexed or partitioned fields where applicable (e.g., `token_address`, `block_time`, `chain_id`)
-    - If analyzing a time-series trend, extract only representative points per interval (e.g., first trade per day or hourly average)
+    # Guidelines
+    Write an efficient and optimized Trino SQL query that follows these principles:
+    1. Avoid full table scans or returning large raw datasets
+    2. Only select required fields explicitly (no SELECT *)
+    3. Reduce data granularity where possible (e.g. daily/hourly aggregation instead of per-event data)
+    4. Use Trino-supported window functions (e.g., ROW_NUMBER, RANK) or aggregations (e.g., MIN, MAX, AVG) to reduce data volume
+    5. Use `WHERE` clauses to filter early and reduce scanned rows (pushdown filters)
+    6. If analyzing a time-series trend, extract only representative points per interval (e.g., first trade per day or hourly average)
+    7. Limit the number of rows returned by the query, try your best to get the most important data regarding the user's prompt within the limit contrainst
 
     Also, if the source table is large, suggest using `WITH` CTEs to isolate relevant subsets before joining or applying window functions.
 
-    Please write the query in **TrinoSQL syntax**.
+    Remember, output the optimized Trino SQL query in TrinoSQL syntax.
     """
 
     prompt: str = dspy.InputField(prefix="User's prompt:")
-    most_relevant_table: Table = dspy.InputField(prefix="The most relevant table:")
+    most_relevant_table: FullTable = dspy.InputField(prefix="The most relevant table:")
     original_trino_sql_query: str = dspy.InputField(
         prefix="The original Trino SQL query:"
     )
@@ -65,11 +68,30 @@ class SqlOptimizer(dspy.Signature):
     )
 
 
+class RetrySQLGenerator(dspy.Signature):
+    """Given user's prompt, generated Trino SQL query, and error returned after executing the query, directly return the refined Trino SQL query without including ```sql```.
+
+    # Guideline
+    1. Refine the original Trino SQL query to minimize resource usage and avoid unnecessary data overhead
+    2. The refined Trino SQL query should be more efficient and optimized
+    """
+
+    prompt: str = dspy.InputField(prefix="User's prompt:")
+    original_trino_sql_query: str = dspy.InputField(
+        prefix="The original Trino SQL query:"
+    )
+    error: str = dspy.InputField(prefix="The error returned after executing the query:")
+    refined_trino_sql_query: str = dspy.OutputField(
+        prefix="The refined Trino SQL query:"
+    )
+
+
 class SqlGenerateAgent:
     def __init__(self, table_list_file_path: str, engine=None) -> None:
         self.engine = engine
         self.retrieve_table = dspy.Predict(TableRetriever)
         self.generate_sql = dspy.Predict(SqlGenerator)
+        self.optimize_sql = dspy.Predict(SqlOptimizer)
 
         with open(table_list_file_path, "r") as f:
             data = json.load(f)
@@ -79,7 +101,7 @@ class SqlGenerateAgent:
         }
 
     def generate_sql_by_prompt(self, prompt: str):
-
+        print(f"The user's prompt: {prompt}")
         response = self.retrieve_table(prompt=prompt, table_list=self.full_table_list)
         reasoning = response.reasoning
         table_name = response.most_relevant_table
@@ -87,8 +109,26 @@ class SqlGenerateAgent:
         print(f"The most relevant table: {table_name}")
 
         table_detail = self.full_table_list_dict[table_name]
-        print(f"The table detail: {table_detail}")
+        # print(f"The table detail: {table_detail}")
+
         result = self.generate_sql(prompt=prompt, most_relevant_table=table_detail)
-        sql = result.trino_sql_query
+        print(f"The generated Trino SQL query: {result.trino_sql_query}")
+
+        optimized_sql = self.optimize_sql(
+            prompt=prompt,
+            most_relevant_table=table_detail,
+            original_trino_sql_query=result.trino_sql_query,
+        )
+        print(
+            f"The optimized Trino SQL query: {optimized_sql.optimized_trino_sql_query}"
+        )
+
+        sql = optimized_sql.optimized_trino_sql_query
         filename = result.output_filename
         return sql, filename
+
+    def retry_generate_sql_by_prompt(self, prompt: str, original_sql: str, error: str):
+        result = self.retry_generate_sql(
+            prompt=prompt, original_trino_sql_query=original_sql, error=error
+        )
+        return result.refined_trino_sql_query
