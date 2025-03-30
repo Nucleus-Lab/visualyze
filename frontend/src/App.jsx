@@ -50,6 +50,8 @@ function App() {
   const [isChatCollapsing, setIsChatCollapsing] = useState(false);
   // State to track when visualization is expanding
   const [isVizExpanding, setIsVizExpanding] = useState(false);
+  // Reference to the Chat component for focus management
+  const chatComponentRef = useRef(null);
 
   // State to track animations for visualizations
   const [removingViz, setRemovingViz] = useState(null);
@@ -184,6 +186,13 @@ function App() {
       if (e.ctrlKey && e.keyCode === 73) {
         e.preventDefault(); // Prevent default browser behavior
         setIsChatOpen(prev => !prev);
+        // Focus the chat input when opening
+        if (!isChatOpen) {
+          // Use setTimeout to ensure the chat pane is visible before focusing
+          setTimeout(() => {
+            chatComponentRef.current?.focusInput();
+          }, 10);
+        }
       }
       // Check for Ctrl+B (keyCode 66 for 'B')
       if (e.ctrlKey && e.keyCode === 66) {
@@ -194,7 +203,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, []);
+  }, [isChatOpen]);
 
   // Effect to scan for visualization files
   useEffect(() => {
@@ -419,6 +428,15 @@ function App() {
     }, 500);
   };
 
+  // Update the chat open handler to focus input when opening
+  const handleChatOpen = () => {
+    setIsChatOpen(true);
+    // Use setTimeout to ensure the chat pane is visible before focusing
+    setTimeout(() => {
+      chatComponentRef.current?.focusInput();
+    }, 10);
+  };
+
   // If Privy is not ready, show loading state
   if (!ready) {
     return (
@@ -623,7 +641,7 @@ function App() {
       {/* Floating Chat Button - Only visible when chat is hidden */}
       {!isChatOpen && (
         <div 
-          onClick={() => setIsChatOpen(true)}
+          onClick={handleChatOpen}
           className="fixed bottom-4 right-4 bg-[#2D2D3B] text-white p-3 rounded-full shadow-lg cursor-pointer hover:bg-[#3C3C4E] transition-colors z-50"
           title="Open AI Terminal (Ctrl+I)"
         >
@@ -650,6 +668,7 @@ function App() {
         {isChatOpen && (
           <div className="h-[calc(300px-48px)]">
             <Chat 
+              ref={chatComponentRef}
               hasSubscription={hasSubscription} 
               onSubscribe={handleSubscribe}
               activeConversationId={activeConversationId}

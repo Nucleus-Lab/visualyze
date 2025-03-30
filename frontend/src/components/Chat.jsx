@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { FaPaperPlane, FaCrown } from 'react-icons/fa';
 import { addMessageNode, updateNodeWithAIContent } from '../utils/chatHistoryService';
 
-const Chat = ({ 
+const Chat = forwardRef(({ 
   hasSubscription, 
   onSubscribe, 
   activeConversationId, 
@@ -12,11 +12,18 @@ const Chat = ({
   setMessages: setExternalMessages,
   refreshFileExplorer,
   collapseChat
-}) => {
+}, ref) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const [isTypingResponse, setIsTypingResponse] = useState(false);
+
+  // Expose the inputRef's focus method to parent components
+  useImperativeHandle(ref, () => ({
+    focusInput: () => {
+      inputRef.current?.focus();
+    }
+  }));
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -256,6 +263,6 @@ const Chat = ({
       </form>
     </div>
   );
-};
+});
 
 export default Chat; 
