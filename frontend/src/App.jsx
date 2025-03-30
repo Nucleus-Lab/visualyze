@@ -89,7 +89,7 @@ function App() {
             
             if (response.ok) {
               break; // Success, exit the retry loop
-            } else {
+    } else {
               console.log(`Attempt ${retryCount+1}/${retries+1} failed, retrying in ${delay}ms...`);
               await new Promise(resolve => setTimeout(resolve, delay));
               retryCount++;
@@ -757,6 +757,19 @@ function App() {
         <div className={`${isFileExplorerOpen ? 'left-pane' : 'w-12'} ${isDragging ? 'dragging' : 'transition-all duration-300'}`} 
              style={{ width: isFileExplorerOpen ? `${leftPaneWidth}px` : '48px' }}>
         <div className={`h-full flex flex-col ${isFileExplorerOpen ? 'w-full bg-[#22222E]' : 'w-12 bg-[#22222E]'}`}>
+            
+            {/* Add Logo and App Name at the top - aligned to the left with proper logo handling */}
+            <div className={`flex items-center border-b border-[#1A1A24] p-2 ${isFileExplorerOpen ? 'justify-start pl-4' : 'justify-center'}`}>
+              <div className={`${isFileExplorerOpen ? '' : 'w-full flex justify-center'}`}>
+                <img 
+                  src="/logo.png" 
+                  alt="Visualyze Logo" 
+                  className={`${isFileExplorerOpen ? 'h-8 w-8 mr-2' : 'h-6 w-6'} object-contain`} 
+                />
+              </div>
+              {isFileExplorerOpen && <span className="text-white font-semibold text-lg">Visualyze</span>}
+            </div>
+            
           {isFileExplorerOpen ? (
               // Full Left Pane with Tabs
               <>
@@ -787,7 +800,7 @@ function App() {
                   <FaChevronLeft />
                 </button>
                 </div>
-  
+    
                 {/* Tab Content */}
                 <div className="flex-1 overflow-auto custom-scrollbar">
                   {activeTab === 'files' ? (
@@ -816,7 +829,7 @@ function App() {
                     </div>
                   )}
                 </div>
-  
+    
                 {/* Bottom Section with Subscription Status */}
               <div className="border-t border-[#1A1A24] p-4">
                 <div className="flex flex-col gap-3">
@@ -862,7 +875,7 @@ function App() {
               onClick={() => setIsFileExplorerOpen(true)}
               className="w-full flex flex-col items-center py-4"
             >
-                <div className="text-white hover:text-[#ABA9BF] transition-colors p-2 rounded flex items-center gap-2" title="Open Explorer (Ctrl+B)">
+                  <div className="text-white hover:text-[#ABA9BF] transition-colors p-2 rounded flex items-center gap-2" title="Open Explorer (Ctrl+B)">
                 <FaFolder className="w-6 h-6" />
               </div>
             </button>

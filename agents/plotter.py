@@ -45,7 +45,14 @@ class Plotter(dspy.Signature):
     ```javascript
     return React.createElement("div", { ref: chartRef, className: "w-full h-full bg-[#22222E]" });
     ```
-    5. Must useRef for the ResizeObserver to work
+    5. Must React.useRef for the ResizeObserver to work
+    ```javascript
+    const chartRef = React.useRef(null);
+  
+    React.useEffect(() => {
+      ...
+    ```
+    6. Must use ResizeObserver
     ```javascript
     const resizeObserver = new ResizeObserver(() => { renderChart(); });
     resizeObserver.observe(chartRef.current);

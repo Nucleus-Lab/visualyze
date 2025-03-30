@@ -122,9 +122,21 @@ def generate_figures(prompt: str, csv_dir: str, viz_dir: str):
             )
             for task in tasks
         ]
-        results = [
-            future.result() for future in concurrent.futures.as_completed(futures)
-        ]
+        
+        # Add 1 minute timeout
+        try:
+            results = [
+                future.result(timeout=60) for future in concurrent.futures.as_completed(futures)
+            ]
+        except concurrent.futures.TimeoutError:
+            print("❌ One or more tasks timed out after 1 minute")
+            # Cancel any pending futures
+            for future in futures:
+                future.cancel()
+            # Collect results from completed tasks
+            results = [
+                future.result() for future in futures if future.done() and not future.cancelled()
+            ]
 
     return results
 
