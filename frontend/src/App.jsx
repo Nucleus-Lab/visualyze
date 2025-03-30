@@ -44,6 +44,44 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
+  // Function to refresh file explorer when new visualizations are created
+  const refreshFileExplorer = async (highlightFile = null) => {
+    try {
+      // Fetch visualization files from backend
+      const response = await fetch('http://localhost:8000/api/visualizations')
+      const data = await response.json()
+      
+      // Create file structure and prepare for component loading
+      const newFileStructure = {
+        visualizations: {}
+      }
+      
+      // Add each visualization file to the structure
+      data.files.forEach(fileName => {
+        newFileStructure.visualizations[fileName] = null
+      })
+      
+      setFileStructure(newFileStructure)
+      console.log('Refreshed visualization files:', data.files)
+      
+      // Automatically open the file explorer if closed
+      if (!isFileExplorerOpen) {
+        setIsFileExplorerOpen(true)
+      }
+      
+      // If a specific file should be highlighted, select it
+      if (highlightFile && data.files.includes(highlightFile)) {
+        handleVisualizationSelect(`visualizations/${highlightFile}`)
+        
+        // Show a toast notification
+        showToast(`New visualization created: ${highlightFile}`)
+      }
+    } catch (error) {
+      console.error('Error refreshing visualization files:', error)
+      showToast("Failed to refresh file explorer", null)
+    }
+  }
+
   // Function to show toast
   const showToast = (message, txHash = null) => {
     setToast({ message, txHash });
@@ -105,30 +143,7 @@ function App() {
 
   // Effect to scan for visualization files
   useEffect(() => {
-    const loadVisualizationFiles = async () => {
-      try {
-        // Fetch visualization files from backend
-        const response = await fetch('http://localhost:8000/api/visualizations')
-        const data = await response.json()
-        
-        // Create file structure and prepare for component loading
-        const newFileStructure = {
-          visualizations: {}
-        }
-        
-        // Add each visualization file to the structure
-        data.files.forEach(fileName => {
-          newFileStructure.visualizations[fileName] = null
-        })
-        
-        setFileStructure(newFileStructure)
-        console.log('Found visualization files:', data.files)
-      } catch (error) {
-        console.error('Error loading visualization files:', error)
-      }
-    }
-
-    loadVisualizationFiles()
+    refreshFileExplorer();
   }, [])
 
   // Effect to check subscription status when user is authenticated
@@ -531,6 +546,7 @@ function App() {
                 onMessageSent={handleMessageSent}
                 messages={messages}
                 setMessages={setMessages}
+                refreshFileExplorer={refreshFileExplorer}
               />
             </div>
           )}

@@ -14,6 +14,9 @@ from database.chat_history import (
 )
 import uuid
 from datetime import datetime
+import random
+import shutil
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -198,6 +201,82 @@ async def get_node_branch(conversation_id: str, node_id: str):
         return {"branch": formatted_branch}
     except Exception as e:
         logger.error(f"Error getting branch: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/process-prompt")
+async def process_prompt(data: Dict[str, Any] = Body(...)):
+    """
+    Process a user prompt through the AI agent.
+    
+    For now, this is a mock implementation that:
+    1. Takes the user prompt
+    2. Selects a visualization template from samples
+    3. Customizes it slightly
+    4. Saves it as a new visualization
+    5. Returns the filename to the frontend
+    """
+    try:
+        prompt = data.get("prompt")
+        conversation_id = data.get("conversationId")
+        node_id = data.get("nodeId")
+        
+        if not prompt:
+            raise HTTPException(status_code=400, detail="Missing prompt")
+            
+        logger.info(f"Processing prompt: {prompt[:50]}...")
+        
+        # TODO: In a real implementation, this would call the AI agent in ai-agent/
+        # For now, we'll mock it by copying and modifying an existing visualization
+        
+        # 1. Select a template file (randomly choose between existing visualizations)
+        template_files = [f for f in os.listdir(VISUALIZATIONS_DIR) if f.endswith('.js')]
+        if not template_files:
+            raise HTTPException(status_code=500, detail="No template visualizations available")
+            
+        template_file = random.choice(template_files)
+        template_path = os.path.join(VISUALIZATIONS_DIR, template_file)
+        
+        # 2. Read the template
+        with open(template_path, 'r', encoding='utf-8') as f:
+            template_code = f.read()
+            
+        # 3. Modify the template (simple modifications for demonstration)
+        # Generate a unique ID for the new file
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        new_filename = f"prompt_viz_{timestamp}.js"
+        
+        # Simple customization: Change the title and add a comment about the prompt
+        modified_code = template_code.replace(
+            "const titleText = ",
+            f"// Generated from prompt: {prompt}\n  const titleText = "
+        )
+        
+        # Replace the title
+        modified_code = modified_code.replace(
+            "\"Web3 DeFi Transactions Over Time\"",
+            f"\"{prompt[:30]}...\""
+        )
+        
+        # 4. Save the new visualization file
+        new_file_path = os.path.join(VISUALIZATIONS_DIR, new_filename)
+        with open(new_file_path, 'w', encoding='utf-8') as f:
+            f.write(modified_code)
+            
+        logger.info(f"Created new visualization file: {new_filename}")
+        
+        # 5. Update the conversation in chat history if IDs were provided
+        if conversation_id and node_id:
+            ai_response = f"I've created a visualization based on your prompt. You can view it by clicking on '{new_filename}' in the file explorer."
+            update_node_with_ai_response(conversation_id, node_id, ai_response)
+            logger.info(f"Updated conversation node with AI response")
+        
+        return {
+            "success": True,
+            "message": "Visualization generated successfully",
+            "filename": new_filename
+        }
+    except Exception as e:
+        logger.error(f"Error processing prompt: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

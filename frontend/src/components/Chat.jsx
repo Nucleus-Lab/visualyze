@@ -9,7 +9,8 @@ const Chat = ({
   activeNodeId, 
   onMessageSent,
   messages: externalMessages,
-  setMessages: setExternalMessages
+  setMessages: setExternalMessages,
+  refreshFileExplorer
 }) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
@@ -68,6 +69,14 @@ const Chat = ({
     setInput(''); // Clear input field
 
     try {
+      // Add loading message to UI to indicate processing
+      const loadingMessage = {
+        text: "Processing your request...",
+        sender: 'ai',
+        timestamp: new Date().toISOString(),
+      };
+      setExternalMessages(prev => [...prev, loadingMessage]);
+      
       // Save user message to backend if we have an active conversation
       let userNodeId = null;
       if (activeConversationId) {
@@ -79,47 +88,62 @@ const Chat = ({
           activeNodeId // If responding to a historical node, this will create a branch
         );
         userNodeId = userNode.id;
-        
-        // Notify parent component about the new message
-        if (onMessageSent) {
-          onMessageSent(activeConversationId, userNode);
-        }
       }
 
-      // TODO: Implement actual AI response logic here
-      // For now, we'll just add a mock response
-      const aiResponseText = 'This is a mock AI response. The actual AI integration will be implemented later.';
+      // Call the AI processing endpoint
+      const response = await fetch('http://localhost:8000/api/process-prompt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: userInput,
+          conversationId: activeConversationId,
+          nodeId: userNodeId
+        }),
+      });
       
-      // Add AI response to UI
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to process prompt');
+      }
+      
+      // Remove the loading message
+      setExternalMessages(prev => prev.filter(msg => msg !== loadingMessage));
+      
+      // Add AI response to UI with the generated visualization info
+      const aiResponseText = `I've created a visualization based on your prompt. You can view it by clicking on '${data.filename}' in the file explorer.`;
+      
       const aiMessage = {
         text: aiResponseText,
         sender: 'ai',
         timestamp: new Date().toISOString(),
       };
 
-      setTimeout(() => {
-        setExternalMessages(prev => [...prev, aiMessage]);
-        
-        // Save AI response to backend if we have an active conversation
-        if (activeConversationId && userNodeId) {
-          // Update the node with AI response
-          updateNodeWithAIContent(
-            activeConversationId,
-            userNodeId,
-            aiResponseText
-          ).then(aiNode => {
-            // Notify parent component about the new AI message
-            if (onMessageSent) {
-              onMessageSent(activeConversationId, aiNode);
-            }
-          });
-        }
-      }, 1000);
+      setExternalMessages(prev => [...prev, aiMessage]);
+      
+      // No need to update the node with AI response as it's already done by the backend
+      
+      // Notify parent component about the new message
+      if (onMessageSent && activeConversationId) {
+        onMessageSent(activeConversationId, { id: userNodeId });
+      }
+
+      // Refresh the file explorer to show the new visualization file
+      if (refreshFileExplorer) {
+        console.log("Refreshing file explorer after generating visualization:", data.filename);
+        refreshFileExplorer(data.filename);
+      }
     } catch (error) {
       console.error("Error handling chat message:", error);
+      
+      // Remove any loading message
+      setExternalMessages(prev => prev.filter(msg => msg.text !== "Processing your request..."));
+      
       // Show error in chat
       setExternalMessages(prev => [...prev, {
-        text: "Error: Failed to process your message. Please try again.",
+        text: `Error: ${error.message || 'Failed to process your message. Please try again.'}`,
         sender: 'ai',
         timestamp: new Date().toISOString(),
       }]);

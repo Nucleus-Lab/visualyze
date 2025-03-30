@@ -79,6 +79,40 @@
               "content": "This is a mock AI response. The actual AI integration will be implemented later."
             }
           ]
+        },
+        {
+          "id": "a45519a0-2a41-46ee-96a5-cc8369cdfabf",
+          "timestamp": "2025-03-30T10:20:47.343519",
+          "parentId": "f385aeda-2271-486a-82bb-352cfd677460",
+          "messages": [
+            {
+              "type": "user",
+              "timestamp": "2025-03-30T10:20:47.343519",
+              "content": "Help me generate one special version"
+            },
+            {
+              "type": "ai",
+              "timestamp": "2025-03-30T10:20:47.356486",
+              "content": "I've created a visualization based on your prompt. You can view it by clicking on 'prompt_viz_20250330102047.js' in the file explorer."
+            }
+          ]
+        },
+        {
+          "id": "3349db9d-38a3-41ce-af3e-a3405ea6ed06",
+          "timestamp": "2025-03-30T10:24:58.544370",
+          "parentId": "a45519a0-2a41-46ee-96a5-cc8369cdfabf",
+          "messages": [
+            {
+              "type": "user",
+              "timestamp": "2025-03-30T10:24:58.544370",
+              "content": "sdfsff"
+            },
+            {
+              "type": "ai",
+              "timestamp": "2025-03-30T10:24:58.555852",
+              "content": "I've created a visualization based on your prompt. You can view it by clicking on 'prompt_viz_20250330102458.js' in the file explorer."
+            }
+          ]
         }
       ]
     }
