@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import FileExplorer from './components/FileExplorer'
 import Chat from './components/Chat'
 import Toast from './components/Toast'
@@ -9,6 +9,7 @@ import * as d3 from "d3";
 import React from "react";
 import { checkSubscription, subscribe } from './utils/contract';
 import { getConversations, getConversation, createConversation, getNodeBranch } from './utils/chatHistoryService';
+import { Visualization, LoadingVisualization } from './components/Visualization';
 
 function App() {
   const { login, ready, authenticated, user, wallet } = usePrivy();
@@ -72,113 +73,8 @@ function App() {
   // State to track recently removed visualizations for animation
   const [removedVisualizations, setRemovedVisualizations] = useState([]);
 
-  // Add this effect to clear content when user changes
-  useEffect(() => {
-    if (user?.wallet?.address) {
-      // Clear file explorer and canvas when user changes
-      setFileStructure({ visualizations: {} });
-      setSelectedVisualizations([]);
-      setVisualizationComponents({});
-      console.log("Cleared content for new user:", user.wallet.address);
-    }
-  }, [user?.wallet?.address]); // This will trigger when the wallet address changes
-
-  // Function to refresh file explorer when new visualizations are created
-  const refreshFileExplorer = async (highlightFile = null) => {
-    try {
-      // Get wallet address
-      const walletAddress = user?.wallet?.address || 'anonymous';
-
-      // Create empty structure first in case fetch fails
-      const newFileStructure = {
-        visualizations: {}
-      };
-      
-      setFileStructure(newFileStructure);
-    
-      
-      // Only fetch files if we have a wallet address
-      if (walletAddress !== 'anonymous') {
-        // Fetch user-specific visualization files
-        console.log(`Fetching all visualiations for ${walletAddress}`)
-        const userResponse = await fetch(`http://localhost:8000/api/visualizations/${walletAddress}`)
-        const userData = await userResponse.json()
-
-        console.log("userData", userData)
-      
-        // Fetch template visualizations
-        const templatesResponse = await fetch(`http://localhost:8000/api/visualizations/templates`)
-        const templatesData = await templatesResponse.json()
-        
-        // Create file structure and prepare for component loading
-        const newFileStructure = {
-          visualizations: {}
-        }
-        
-        // Add user's visualization files with a prefix to distinguish them
-        userData.files.forEach(fileName => {
-          newFileStructure.visualizations[`(My) ${fileName}`] = null
-        })
-        
-        // Add template visualization files
-        templatesData.files.forEach(fileName => {
-          newFileStructure.visualizations[`(Template) ${fileName}`] = null
-        })
-        
-        setFileStructure(newFileStructure)
-        console.log('Refreshed visualization files:', {
-          user: userData.files,
-          templates: templatesData.files
-        })
-      }
-      
-      // Automatically open the file explorer if closed
-      if (!isFileExplorerOpen) {
-        setIsFileExplorerOpen(true)
-      }
-      
-      // If a specific file should be highlighted, select it and display it in the canvas
-      if (highlightFile) {
-        // Extract the filename from the path if it contains a path
-        const pathParts = highlightFile.split('/');
-        const userAddress = pathParts.length > 1 ? pathParts[0] : '';
-        const fileName = pathParts.length > 1 ? pathParts[1] : pathParts[0];
-        
-        console.log('Highlighting file:', { highlightFile, userAddress, fileName });
-        
-        // Format the display name based on whether it's a user file or template
-        const displayName = userAddress === walletAddress.replace('0x', '').toLowerCase() 
-          ? `(My) ${fileName}` 
-          : userData.files.includes(fileName) 
-            ? `(My) ${fileName}` 
-            : templatesData.files.includes(fileName) 
-              ? `(Template) ${fileName}` 
-              : fileName;
-        
-        // Add to selected visualizations if not already included
-        if (!selectedVisualizations.includes(highlightFile)) {
-          // Always add the new visualization to existing ones, don't replace
-          setSelectedVisualizations(prev => [...prev, highlightFile])
-          
-          // Load visualization component if not already loaded
-          loadVisualizationComponent(highlightFile)
-          
-          // Set as newest visualization for highlighting
-          setNewestVisualization(highlightFile)
-          
-          // Clear the highlight after 4 seconds
-          setTimeout(() => {
-            setNewestVisualization(null)
-          }, 4000)
-        }
-      }
-    } catch (error) {
-      console.error('Error refreshing visualization files:', error)
-    }
-  }
-  
-  // Helper function to load a visualization component
-  const loadVisualizationComponent = async (filePath) => {
+  // Helper function to load a visualization component - moved inside the component
+  const loadVisualizationComponent = useCallback(async (filePath) => {
     if (!visualizationComponents[filePath]) {
       try {
         console.log("Loading visualization:", filePath);
@@ -194,15 +90,18 @@ function App() {
         console.log("Fetched JS Code length:", data.content.length);
 
         // Dynamically evaluate the JS code received
-        const component = new Function("React", "d3", `
+        const RawComponent = new Function("React", "d3", `
           ${data.content}
           return GeneratedViz;  // Return the component directly
         `)(React, d3);
 
-        // Store the evaluated component in state
+        // Wrap in a memo to prevent unnecessary re-renders
+        const MemoizedComponent = React.memo(RawComponent);
+
+        // Store the memoized component in state
         setVisualizationComponents(prev => ({
           ...prev,
-          [filePath]: component,
+          [filePath]: MemoizedComponent,
         }));
 
         console.log("Successfully loaded visualization component:", filePath);
@@ -210,7 +109,107 @@ function App() {
         console.error("Error loading visualization:", filePath, error);
       }
     }
-  };
+  }, [visualizationComponents]);
+
+  // Add this effect to clear content when user changes
+  useEffect(() => {
+    if (user?.wallet?.address) {
+      // Clear file explorer and canvas when user changes
+      setFileStructure({ visualizations: {} });
+      setSelectedVisualizations([]);
+      setVisualizationComponents({});
+      console.log("Cleared content for new user:", user.wallet.address);
+    }
+  }, [user?.wallet?.address]); // This will trigger when the wallet address changes
+
+  // Function to refresh file explorer when new visualizations are created
+  const refreshFileExplorer = useCallback(async (highlightFiles = null) => {
+    console.log("Starting refreshFileExplorer with:", highlightFiles);
+    try {
+      // Get wallet address
+      const walletAddress = user?.wallet?.address || 'anonymous';
+      
+      // Fetch user-specific visualization files
+      const userResponse = await fetch(`http://localhost:8000/api/visualizations/${walletAddress}`);
+      const userData = await userResponse.json();
+      
+      // Fetch template visualizations
+      const templatesResponse = await fetch(`http://localhost:8000/api/visualizations/templates`);
+      const templatesData = await templatesResponse.json();
+      
+      // Create file structure and prepare for component loading
+      const newFileStructure = {
+        visualizations: {}
+      };
+      
+      // Add user's visualization files with a prefix to distinguish them
+      userData.files.forEach(fileName => {
+        newFileStructure.visualizations[`(My) ${fileName}`] = null;
+      });
+      
+      // Add template visualization files
+      templatesData.files.forEach(fileName => {
+        newFileStructure.visualizations[`(Template) ${fileName}`] = null;
+      });
+      
+      console.log("Setting file structure and handling highlights");
+      // Batch these updates together by using a function to update the state
+      setFileStructure(newFileStructure);
+      
+      // Automatically open the file explorer if closed
+      if (!isFileExplorerOpen) {
+        setIsFileExplorerOpen(true);
+      }
+      
+      // Create an array of files to highlight (if not already an array)
+      const filesToHighlight = Array.isArray(highlightFiles) ? highlightFiles : 
+                              (highlightFiles ? [highlightFiles] : []);
+      
+      // Process each file to highlight
+      if (filesToHighlight.length > 0) {
+        console.log('Highlighting files:', filesToHighlight);
+        
+        // Track all new visualizations to be added
+        const newVisualizations = [];
+        
+        // Load all visualization components first, then update state once
+        const loadPromises = [];
+        
+        for (const highlightFile of filesToHighlight) {
+          // Extract the filename from the path
+          const pathParts = highlightFile.split('/');
+          const userAddress = pathParts.length > 1 ? pathParts[0] : '';
+          const fileName = pathParts.length > 1 ? pathParts[1] : pathParts[0];
+          
+          // Add to selected visualizations if not already included
+          if (!selectedVisualizations.includes(highlightFile)) {
+            newVisualizations.push(highlightFile);
+            
+            // Queue up loading of visualization component
+            loadPromises.push(loadVisualizationComponent(highlightFile));
+          }
+        }
+        
+        // Wait for all visualization components to start loading
+        await Promise.all(loadPromises);
+        
+        // Update selected visualizations with all new ones in a single update
+        if (newVisualizations.length > 0) {
+          console.log("Setting newest visualization and updating selected");
+          setSelectedVisualizations(prev => [...prev, ...newVisualizations]);
+          setNewestVisualization(newVisualizations);
+          
+          // Clear the highlight after 4 seconds
+          setTimeout(() => {
+            setNewestVisualization(null);
+          }, 4000);
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing visualization files:', error);
+      showToast("Failed to refresh file explorer", null);
+    }
+  }, [user?.wallet?.address, isFileExplorerOpen, selectedVisualizations, loadVisualizationComponent]);
 
   // Function to show toast
   const showToast = (message, txHash = null) => {
@@ -513,6 +512,7 @@ function App() {
 
   // Function to collapse/hide the chat pane with animation
   const collapseChat = () => {
+    console.log("setting chat to collapse...")
     setIsChatCollapsing(true);
     setIsVizExpanding(true);
     
@@ -634,7 +634,8 @@ function App() {
   }, [chatPaneWidth]);
 
   // Handler for the Chat component to send messages to AI
-  const handleChatMessage = async (message) => {
+  const handleChatMessage = useCallback(async (message) => {
+    console.log("Handling chat message:", message.slice(0, 20) + "...");
     try {
       // Call the AI processing endpoint
       const response = await fetch('http://localhost:8000/api/process-prompt', {
@@ -656,15 +657,49 @@ function App() {
         throw new Error(data.detail || 'Failed to process prompt');
       }
       
-      // Refresh file explorer to show new visualization
-      refreshFileExplorer(data.filename);
+      console.log("Process-prompt response received:", data);
+      
+      // Refresh file explorer to show new visualizations (now passing the entire array)
+      await refreshFileExplorer(data.filenames);
       
       return data;
     } catch (error) {
       console.error("Error processing chat message:", error);
       throw error;
     }
-  };
+  }, [activeConversationId, activeNodeId, refreshFileExplorer, user?.wallet?.address]);
+
+  // Helper function to get display name - moved from inline to a separate function
+  const getDisplayName = useCallback((path) => {
+    if (!path) return "";
+    
+    const parts = path.split('/');
+    if (parts.length > 1) {
+      // Path with user address
+      const fileName = parts[parts.length - 1];
+      const userAddress = parts[0];
+      
+      // Check if this is the current user's visualization
+      const currentWalletAddress = user?.wallet?.address || 'anonymous';
+      const currentUserAddress = currentWalletAddress.replace('0x', '').toLowerCase();
+      
+      if (userAddress === currentUserAddress) {
+        return `${fileName}`;
+      } else if (userAddress === 'templates') {
+        return `(Template) ${fileName}`;
+      } else {
+        return fileName;
+      }
+    } else {
+      // Just a filename
+      return path;
+    }
+  }, [user?.wallet?.address]);
+
+  // Use useMemo to compute the list of visualizations to render
+  const visualizationsToRender = useMemo(() => {
+    return [...selectedVisualizations, ...removedVisualizations.filter(v => !selectedVisualizations.includes(v))];
+  }, [selectedVisualizations, removedVisualizations]);
 
   // If Privy is not ready, show loading state
   if (!ready) {
@@ -836,81 +871,36 @@ function App() {
             ? 'grid-cols-1' 
             : 'grid-cols-1 lg:grid-cols-2'
         } auto-rows-fr ${isVizExpanding ? 'viz-expand' : ''}`}>
-          {/* Show both active and removed (animating) visualizations */}
-          {[...selectedVisualizations, ...removedVisualizations.filter(v => !selectedVisualizations.includes(v))].map((vizPath, index) => {
+          {visualizationsToRender.map((vizPath, index) => {
             const VisualizationComponent = visualizationComponents[vizPath];
-            console.log('Rendering visualization:', vizPath, 'Component:', !!VisualizationComponent);
-            const isNewest = vizPath === newestVisualization;
+            const isNewest = Array.isArray(newestVisualization) && newestVisualization.includes(vizPath);
             const isRemoving = removingViz === vizPath;
-            
-            // Get display name for the visualization
-            const getDisplayName = (path) => {
-              if (!path) return "";
-              
-              const parts = path.split('/');
-              if (parts.length > 1) {
-                // Path with user address
-                const fileName = parts[parts.length - 1];
-                const userAddress = parts[0];
-                
-                // Check if this is the current user's visualization
-                const currentWalletAddress = user?.wallet?.address || 'anonymous';
-                const currentUserAddress = currentWalletAddress.replace('0x', '').toLowerCase();
-                
-                if (userAddress === currentUserAddress) {
-                  return `${fileName}`;
-                } else if (userAddress === 'templates') {
-                  return `(Template) ${fileName}`;
-                } else {
-                  return fileName;
-                }
-              } else {
-                // Just a filename
-                return path;
-              }
-            };
-            
+            const isAdding = addingViz === vizPath;
             const displayName = getDisplayName(vizPath);
+            const isSingle = selectedVisualizations.length === 1;
+            
+            // Only log once per render cycle
+            console.log('Rendering visualization:', vizPath, 'Component exists:', !!VisualizationComponent);
             
             return VisualizationComponent ? (
-              <div 
-                key={vizPath} // Use vizPath as key instead of index for proper animation
-                ref={isNewest ? newestVizRef : null}
-                className={`bg-[#22222E] rounded-lg p-5 text-white flex flex-col ${
-                  selectedVisualizations.length === 1 
-                    ? 'min-h-[calc(100vh-40px)]' // Fixed height unaffected by chat pane
-                    : 'min-h-[450px]'
-                } ${isNewest ? 'viz-highlight newest-viz' : ''} 
-                ${addingViz === vizPath ? 'visualization-added' : ''} 
-                ${isRemoving ? 'visualization-removed' : ''} 
-                new-viz-enter new-viz-enter-active relative z-10`}
-              >
-                {/* Visualization title showing the displayName */}
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className="text-sm font-medium text-gray-400 truncate">
-                    {displayName}
-                  </h3>
-                  {vizPath === newestVisualization && (
-                    <span className="text-xs bg-accent2 text-[#22222E] px-2 py-0.5 rounded-full animate-pulse">
-                      New
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1 relative">
-                  <div className="absolute inset-0 visualization-container">
-                    <VisualizationComponent />
-                  </div>
-                </div>
-              </div>
+              <Visualization
+                key={vizPath}
+                path={vizPath}
+                component={VisualizationComponent}
+                displayName={displayName}
+                isNewest={isNewest}
+                isAdding={isAdding}
+                isRemoving={isRemoving}
+                isSingle={isSingle}
+                refProp={isNewest ? newestVizRef : null}
+              />
             ) : (
-              <div key={index} className={`bg-[#22222E] rounded-lg p-5 text-white flex items-center justify-center ${
-                selectedVisualizations.length === 1 
-                  ? 'min-h-[calc(100vh-40px)]' // Fixed height unaffected by chat pane
-                  : 'min-h-[400px]'
-              }`}>
-                Loading visualization: {displayName}...
-              </div>
-            )
+              <LoadingVisualization 
+                key={vizPath} 
+                displayName={displayName}
+                isSingle={isSingle}
+              />
+            );
           })}
         </div>
       </div>

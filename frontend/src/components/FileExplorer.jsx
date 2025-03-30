@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import React from "react";
 import { FaChevronRight, FaChevronDown, FaFolder, FaFolderOpen, FaFile } from 'react-icons/fa';
 
 const FileExplorer = ({ fileStructure, onFileSelect, activeVisualizations = [] }) => {
@@ -82,4 +83,4 @@ const FileExplorer = ({ fileStructure, onFileSelect, activeVisualizations = [] }
   );
 };
 
-export default FileExplorer; 
+export default React.memo(FileExplorer); 

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { FaPaperPlane, FaCrown } from 'react-icons/fa';
 import { addMessageNode, updateNodeWithAIContent } from '../utils/chatHistoryService';
+import React from "react";
 
 const Chat = forwardRef(({ 
   hasSubscription, 
@@ -66,6 +67,8 @@ const Chat = forwardRef(({
       return;
     }
 
+    console.log("adding user message to UI")
+
     // Add user message to UI
     const userMessage = {
       text: input,
@@ -74,6 +77,8 @@ const Chat = forwardRef(({
     };
 
     setExternalMessages(prev => [...prev, userMessage]);
+
+    console.log("store the user input to send later")
     
     // Store the input to send later
     const userInput = input;
@@ -103,7 +108,10 @@ const Chat = forwardRef(({
 
       // Use the handleChatMessage function from App.jsx if provided
       if (handleChatMessage) {
+        console.log("await handleChatMessage")
         const data = await handleChatMessage(userInput);
+
+        console.log("removing the loading messages")
         
         // Remove the loading message
         setExternalMessages(prev => prev.filter(msg => msg !== loadingMessage));
@@ -112,7 +120,11 @@ const Chat = forwardRef(({
         setIsTypingResponse(true);
         
         // Add AI response to UI with the generated visualization info
-        const aiResponseText = `I've created a visualization based on your prompt. The visualization '${data.filename.split('/').pop()}' has been added to the canvas. You can interact with it alongside any existing visualizations.`;
+        const aiResponseText = Array.isArray(data.filenames) 
+          ? (data.filenames.length === 1
+            ? `I've created a visualization based on your prompt. The visualization '${data.filenames[0].split('/').pop()}' has been added to the canvas. You can interact with it alongside any existing visualizations.`
+            : `I've created ${data.filenames.length} visualizations based on your prompt: ${data.filenames.map(f => `'${f.split('/').pop()}'`).join(', ')}. They have been added to the canvas. You can interact with them alongside any existing visualizations.`)
+          : `I've created a visualization based on your prompt. The visualization has been added to the canvas. You can interact with it alongside any existing visualizations.`;
         
         // Simulate typing delay for better UX
         setTimeout(() => {
@@ -126,48 +138,7 @@ const Chat = forwardRef(({
           setIsTypingResponse(false);
           
         }, 500);
-      } else {
-        // Legacy code path using direct fetch (for backward compatibility)
-        const response = await fetch('http://localhost:8000/api/process-prompt', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt: userInput,
-            conversationId: activeConversationId,
-            nodeId: userNodeId
-          }),
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.detail || 'Failed to process prompt');
-        }
-        
-        // Remove the loading message
-        setExternalMessages(prev => prev.filter(msg => msg !== loadingMessage));
-        
-        // Show typing animation
-        setIsTypingResponse(true);
-        
-        // Add AI response to UI with the generated visualization info
-        const aiResponseText = `I've created a visualization based on your prompt. The visualization '${data.filename}' has been added to the canvas. You can interact with it alongside any existing visualizations.`;
-        
-        // Simulate typing delay for better UX
-        setTimeout(() => {
-          const aiMessage = {
-            text: aiResponseText,
-            sender: 'ai',
-            timestamp: new Date().toISOString(),
-          };
-    
-          setExternalMessages(prev => [...prev, aiMessage]);
-          setIsTypingResponse(false);
-          
-        }, 500);
-      }
+      } 
       
       // Notify parent component about the new message
       if (onMessageSent && activeConversationId) {
@@ -176,6 +147,7 @@ const Chat = forwardRef(({
 
       // If collapseChat is provided, use it to hide the chat pane
       if (collapseChat) {
+        console.log("collapsing chat pane")
         collapseChat(); // Will hide the chat pane
       }
     } catch (error) {
@@ -286,4 +258,4 @@ const Chat = forwardRef(({
   );
 });
 
-export default Chat; 
+export default React.memo(Chat); 
