@@ -15,6 +15,7 @@ class Plotter(dspy.Signature):
     6. Do not overlap the elements, such as the axis labels and ticks
         - For the vertical axis (left), put the axis labels at top of the vertical axis, and
         - For the horizontal axis (bottom), put the axis labels at right of the horizontal axis
+        - For the position of the vertical axis, the x in transform(x,y) should be bigger to leave enough space for the axis labels to be position within the container
     7. For the large numbers in the axis labels, render in SI Prefixes (K, M, etc).
     8. You must include a title for the visualization
 
