@@ -1,7 +1,7 @@
 import dspy
 from pydantic import BaseModel
 import json
-from utils.data_structures import FullTable
+from agents.utils.data_structures import FullTable
 
 
 class TableRetriever(dspy.Signature):

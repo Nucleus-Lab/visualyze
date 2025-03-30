@@ -1,0 +1,7 @@
+dspy==2.6.16
+dune-client
+python-dotenv
+openai
+pandas==2.1.1
+numpy==1.26.4
+requests
