@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import logging
 from typing import Dict, Any
-from database.chat_history import (
+from backend.database.chat_history import (
     get_all_conversations, 
     get_conversation,
     create_conversation, 
@@ -12,9 +12,11 @@ from database.chat_history import (
     update_node_with_ai_response,
     get_branch
 )
+from agents.main import main as prompt_agent
+# temp TODO:
+from agents.temp.temp_agent import temp_mock_agent
 import uuid
 from datetime import datetime
-import random
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -31,14 +33,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# TODO: define this in config/.env
 # Define base visualization directory and user-specific paths
-VISUALIZATIONS_DIR = "../frontend/src/components/visualizations"
+VISUALIZATIONS_DIR = "frontend/src/components/visualizations"
 TEMPLATES_DIR = os.path.join(VISUALIZATIONS_DIR, "templates")
 os.makedirs(VISUALIZATIONS_DIR, exist_ok=True)
 os.makedirs(TEMPLATES_DIR, exist_ok=True)
 
+DATA_DIR = "frontend/public/data"
+os.makedirs(DATA_DIR, exist_ok=True)
+
 # Helper function to get or create user directory
-def get_user_dir(wallet_address):
+def get_user_visualization_dir(wallet_address):
     """Create a user-specific directory based on wallet address and return the path"""
     # Sanitize wallet address for use as directory name
     sanitized_address = wallet_address.replace('0x', '').lower()
@@ -80,7 +86,7 @@ async def list_user_visualizations(wallet_address: str):
         logger.info(f"Fetching visualizations for user: {wallet_address}")
         
         # Get or create user directory
-        user_dir = get_user_dir(wallet_address)
+        user_dir = get_user_visualization_dir(wallet_address)
         
         # Get user-specific visualization files
         user_files = []
@@ -304,57 +310,36 @@ async def process_prompt(data: Dict[str, Any] = Body(...)):
         logger.info(f"Processing prompt for wallet {wallet_address}: {prompt[:50]}...")
         
         # Get or create user directory
-        user_dir = get_user_dir(wallet_address)
+        user_viz_dir = get_user_visualization_dir(wallet_address)
         
-        # 1. Select a template file from templates directory
-        template_files = [f for f in os.listdir(TEMPLATES_DIR) if f.endswith('.js')]
-        if not template_files:
-            raise HTTPException(status_code=500, detail="No template visualizations available")
-            
-        template_file = random.choice(template_files)
-        template_path = os.path.join(TEMPLATES_DIR, template_file)
+        # TODO: change this to actual
+        # results = temp_mock_agent(prompt, csv_dir=DATA_DIR, viz_dir=user_viz_dir)
+        results = prompt_agent(prompt, csv_dir=DATA_DIR, viz_dir=user_viz_dir)
         
-        # 2. Read the template
-        with open(template_path, 'r', encoding='utf-8') as f:
-            template_code = f.read()
-            
-        # 3. Modify the template (simple modifications for demonstration)
-        # Generate a unique ID for the new file
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        new_filename = f"prompt_viz_{timestamp}.js"
-        
-        # Simple customization: Change the title and add a comment about the prompt
-        modified_code = template_code.replace(
-            "const titleText = ",
-            f"// Generated from prompt: {prompt}\n  const titleText = "
-        )
-        
-        # Replace the title
-        modified_code = modified_code.replace(
-            "\"Web3 DeFi Transactions Over Time\"",
-            f"\"{prompt[:30]}...\""
-        )
-        
-        # 4. Save the new visualization file in the user's directory
-        new_file_path = os.path.join(user_dir, new_filename)
-        with open(new_file_path, 'w', encoding='utf-8') as f:
-            f.write(modified_code)
-            
-        logger.info(f"Created new visualization file for user {wallet_address}: {new_filename}")
-        
-        # 5. Update the conversation in chat history if IDs were provided
-        if conversation_id and node_id:
-            ai_response = f"I've created a visualization based on your prompt. You can view it by clicking on '{new_filename}' in the file explorer."
-            update_node_with_ai_response(conversation_id, node_id, ai_response)
-            logger.info(f"Updated conversation node with AI response")
+        print("results", results)
         
         # Get the sanitized wallet address for the response
         sanitized_address = wallet_address.replace('0x', '').lower()
         
+        filenames = []
+        
+        for r in results:
+            if r['result'] == "success":
+                filenames.append(f"{sanitized_address}/{r['file_name']}")
+                logger.info(f"Created new visualization file for user {wallet_address}: {r['file_name']}")
+                # TODO: what to do with AI response??
+                # Update the conversation in chat history if IDs were provided
+                # if conversation_id and node_id:
+                #     ai_response = f"I've created a visualization based on your prompt. You can view it by clicking on '{r['file_name']}' in the file explorer."
+                #     update_node_with_ai_response(conversation_id, node_id, ai_response)
+                #     logger.info(f"Updated conversation node with AI response")
+                        
+        
+        
         return {
             "success": True,
             "message": "Visualization generated successfully",
-            "filename": f"{sanitized_address}/{new_filename}"  # Return path with wallet address
+            "filenames": filenames  # Return paths with wallet address
         }
     except Exception as e:
         logger.error(f"Error processing prompt: {str(e)}")
