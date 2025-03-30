@@ -47,6 +47,7 @@ os.makedirs(TEMPLATES_DIR, exist_ok=True)
 DATA_DIR = "agents/data"
 TARGET_DATA_DIR = "frontend/public/data"
 os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(TARGET_DATA_DIR, exist_ok=True)
 
 # Helper function to get or create user directory
 def get_user_visualization_dir(wallet_address):
