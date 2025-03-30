@@ -3,4 +3,4 @@ ai_agent/
 .env
 .gitignore
 archive/
-share/
+data/share/

@@ -1,28 +1,30 @@
 import dspy
 from pydantic import BaseModel
 import json
-
-
-class Table(BaseModel):
-    table_name: str
-    description: str
-
-
-class FullTable(BaseModel):
-    table_name: str
-    description: str
-    columns: dict
+from utils.data_structures import FullTable
 
 
 class TableRetriever(dspy.Signature):
     """Given user's prompt, select the table which is most relevant to the user's query"""
 
-    prompt = dspy.InputField(prefix="User's prompt:")
+    prompt: str = dspy.InputField(prefix="User's prompt:")
     table_list: list[FullTable] = dspy.InputField(prefix="Available table list:")
     reasoning: str = dspy.OutputField(prefix="Reasoning:")
     most_relevant_table: str = dspy.OutputField(
         prefix="The name of the most relevant table:"
     )
+
+
+class SqlQueryGeneratorWithFullTable(dspy.Signature):
+    """Given user's prompt, generate Trino SQL query, directly return the Trino SQL query without including ```sql```.
+
+    # Guideline
+    1. For varbinary type columns, you should output the hex format of the column value instead of string (i.e., 0x1234567890 instead of '0x1234567890')
+    """
+
+    prompt: str = dspy.InputField(prefix="User's prompt:")
+    table_list: list[FullTable] = dspy.InputField(prefix="Available table list:")
+    trino_sql_query: str = dspy.OutputField(prefix="The generated Trino SQL query:")
 
 
 class SqlGenerator(dspy.Signature):
@@ -92,6 +94,7 @@ class SqlGenerateAgent:
     def __init__(self, table_list_file_path: str, engine=None) -> None:
         self.engine = engine
         self.retrieve_table = dspy.Predict(TableRetriever)
+        self.generate_sql_with_full_table = dspy.Predict(SqlQueryGeneratorWithFullTable)
         self.generate_sql = dspy.Predict(SqlGenerator)
         self.optimize_sql = dspy.Predict(SqlOptimizer)
         self.retry_generate_sql = dspy.Predict(RetrySQLGenerator)
@@ -102,6 +105,12 @@ class SqlGenerateAgent:
         self.full_table_list_dict = {
             table.table_name: table for table in self.full_table_list
         }
+
+    def generate_sql_by_prompt_with_full_table(self, prompt: str):
+        response = self.generate_sql_with_full_table(
+            prompt=prompt, table_list=self.full_table_list
+        )
+        return response.trino_sql_query
 
     def generate_sql_by_prompt(self, prompt: str):
         print(f"The user's prompt: {prompt}")

@@ -7,6 +7,7 @@ from sql_generator import SqlGenerateAgent
 from utils.dune_client import DuneQueryClient
 from planner import Planner
 from plotter import PlotterAgent
+import concurrent.futures
 
 dspy.disable_litellm_logging()
 dspy.disable_logging()
@@ -49,19 +50,28 @@ def main(prompt: str, csv_dir: str, viz_dir: str):
     sql_generator = SqlGenerateAgent(
         table_list_file_path="/home/sheropen/project/hackathon/chat_db/agents/utils/table_list.json",
     )
+
+    # sql = sql_generator.generate_sql_by_prompt_with_full_table(prompt)
+    # print(f"The generated Trino SQL query: {sql}")
+
+    # tasks = planner.split_task_by_prompt(prompt, sql_generator.full_table_list)
     tasks = planner.split_task_by_prompt(prompt)
     results = []
-    for task in tasks:
+
+    def process_task(task, sql_generator, dune_client, csv_dir, viz_dir, prompt):
         result = {"task": task, "result": "failed"}
-        print(f"✅Processing task: {task}")
+
         sql_result, output_filename, table_detail = (
             sql_generator.generate_sql_by_prompt(task)
         )
         task_filename = os.path.basename(output_filename).replace(".csv", "")
-        print(f"✅SQL Result: {sql_result}")
-        print(f"✅Task Filename: {task_filename}")
+        msg = f"✅Processing task: {task}"
+        msg += f"\n✅SQL Result: {sql_result}"
+        msg += f"\n✅Task Filename: {task_filename}"
+        print(msg)
 
         df, error = dune_client.execute_query(sql_result)
+
         if error:
             print(f"❌Error: {error}")
             refined_sql = sql_generator.retry_generate_sql_by_prompt(
@@ -73,13 +83,15 @@ def main(prompt: str, csv_dir: str, viz_dir: str):
         # if still error, skip the task
         if error:
             print(f"❌Error: {error}")
-            continue
+            return result
+
+        print(f"✅Successfully executed query: {task_filename}")
 
         # if df is empty, skip the task
         if df.empty:
             print(f"❌Error: {error}")
             result["result"] = "No information found for this task"
-            continue
+            return result
 
         csv_path = os.path.join(csv_dir, f"{task_filename}.csv")
         if df is not None:
@@ -93,9 +105,20 @@ def main(prompt: str, csv_dir: str, viz_dir: str):
                 result["result"] = "success"
         else:
             result["result"] = "No information found for this task"
-            continue
+            return result
 
-        results.append(result)
+        return result
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [
+            executor.submit(
+                process_task, task, sql_generator, dune_client, csv_dir, viz_dir, prompt
+            )
+            for task in tasks
+        ]
+        results = [
+            future.result() for future in concurrent.futures.as_completed(futures)
+        ]
 
     return results
 
