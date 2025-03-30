@@ -44,7 +44,7 @@ class SqlGenerator(dspy.Signature):
 
 class SqlOptimizer(dspy.Signature):
     """
-    Given a Trino SQL query, optimize it to minimize resource usage and avoid unnecessary data overhead.
+    Given a Trino SQL query, optimize it to minimize resource usage and avoid unnecessary data overhead. For query asking market price, you should group and aggregate the data by mean price of a month.
 
     # Guidelines
     Write an efficient and optimized Trino SQL query that follows these principles:
