@@ -51,10 +51,12 @@ def main(prompt: str, csv_dir: str, viz_dir: str):
     )
     tasks = planner.split_task_by_prompt(prompt)
     results = []
-    for task in tasks:
+    for task in tasks[1:]:
         result = {"task": task, "result": "failed"}
         print(f"✅Processing task: {task}")
-        sql_result, output_filename = sql_generator.generate_sql_by_prompt(task)
+        sql_result, output_filename, table_detail = (
+            sql_generator.generate_sql_by_prompt(task)
+        )
         task_filename = os.path.basename(output_filename).replace(".csv", "")
         print(f"✅SQL Result: {sql_result}")
         print(f"✅Task Filename: {task_filename}")
@@ -63,7 +65,7 @@ def main(prompt: str, csv_dir: str, viz_dir: str):
         if error:
             print(f"❌Error: {error}")
             refined_sql = sql_generator.retry_generate_sql_by_prompt(
-                task, sql_result, error
+                task, sql_result, error, table_detail
             )
             print(f"✅Refined SQL: {refined_sql}")
             df, error = dune_client.execute_query(refined_sql)
@@ -108,9 +110,14 @@ if __name__ == "__main__":
         type=str,
     )
     parser.add_argument(
-        "--result_dir",
-        default="results",
+        "--csv_dir",
+        default="data/csv",
+        type=str,
+    )
+    parser.add_argument(
+        "--viz_dir",
+        default="data/viz",
         type=str,
     )
     args = parser.parse_args()
-    main(args.prompt, args.result_dir)
+    main(args.prompt, args.csv_dir, args.viz_dir)

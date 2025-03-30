@@ -31,6 +31,7 @@ class SqlGenerator(dspy.Signature):
 
     # Guideline
     1. Output filename should be short and represent the generated query
+    2. For varbinary type columns, you should output the hex format of the column value instead of string (i.e., 0x1234567890 instead of '0x1234567890')
     """
 
     prompt: str = dspy.InputField(prefix="User's prompt:")
@@ -77,6 +78,7 @@ class RetrySQLGenerator(dspy.Signature):
     """
 
     prompt: str = dspy.InputField(prefix="User's prompt:")
+    most_relevant_table: FullTable = dspy.InputField(prefix="The most relevant table:")
     original_trino_sql_query: str = dspy.InputField(
         prefix="The original Trino SQL query:"
     )
@@ -92,6 +94,7 @@ class SqlGenerateAgent:
         self.retrieve_table = dspy.Predict(TableRetriever)
         self.generate_sql = dspy.Predict(SqlGenerator)
         self.optimize_sql = dspy.Predict(SqlOptimizer)
+        self.retry_generate_sql = dspy.Predict(RetrySQLGenerator)
 
         with open(table_list_file_path, "r") as f:
             data = json.load(f)
@@ -125,10 +128,15 @@ class SqlGenerateAgent:
 
         sql = optimized_sql.optimized_trino_sql_query
         filename = result.output_filename
-        return sql, filename
+        return sql, filename, table_detail
 
-    def retry_generate_sql_by_prompt(self, prompt: str, original_sql: str, error: str):
+    def retry_generate_sql_by_prompt(
+        self, prompt: str, original_sql: str, error: str, table_detail: FullTable
+    ):
         result = self.retry_generate_sql(
-            prompt=prompt, original_trino_sql_query=original_sql, error=error
+            prompt=prompt,
+            most_relevant_table=table_detail,
+            original_trino_sql_query=original_sql,
+            error=error,
         )
         return result.refined_trino_sql_query
