@@ -699,7 +699,7 @@ function App() {
             ${isDragging ? 'bg-[#D4A017]' : 'bg-[#1A1A24] hover:bg-[#D4A017]'}
             ${isAtMinWidth ? 'min-width-indicator' : ''}
             ${isAtMaxWidth ? 'max-width-indicator' : ''}
-            ${!isFileExplorerOpen ? 'opacity-0 pointer-events-none' : ''}`}
+            ${!isFileExplorerOpen ? 'hidden' : ''}`}
           onMouseDown={handleResizeStart}
           title="Drag to resize"
         >
