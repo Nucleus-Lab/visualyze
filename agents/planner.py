@@ -24,6 +24,6 @@ class Planner:
         print(f"Reasoning: {reasoning}")
         print(f"The list of tasks:")
         for idx, task in enumerate(tasks):
-            print(f"  {idx}. {task}")
+            print(f"  {idx+1}. {task}")
 
         return tasks
