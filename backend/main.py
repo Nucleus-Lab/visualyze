@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 from database.chat_history import (
     get_all_conversations, 
     get_conversation,
@@ -15,8 +15,6 @@ from database.chat_history import (
 import uuid
 from datetime import datetime
 import random
-import shutil
-import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -52,132 +50,7 @@ def get_user_dir(wallet_address):
     logger.info(f"Using user directory: {user_dir}")
     return user_dir
 
-# Copy sample templates to templates directory if it's empty
-def ensure_template_files_exist():
-    """Ensure that at least one template file exists in the templates directory"""
-    if not os.path.exists(TEMPLATES_DIR):
-        os.makedirs(TEMPLATES_DIR, exist_ok=True)
-        
-    # Check if templates directory is empty
-    template_files = [f for f in os.listdir(TEMPLATES_DIR) if f.endswith('.js')]
-    if not template_files:
-        logger.info("No template files found. Creating sample templates...")
-        
-        # Create a simple template visualization
-        sample_template = """
-// Sample Visualization Template
-const GeneratedViz = () => {
-  // Set up dimensions
-  const width = 800;
-  const height = 400;
-  const margin = { top: 50, right: 50, bottom: 70, left: 80 };
-  const titleText = "Web3 DeFi Transactions Over Time";
-  
-  // Set up the D3 visualization
-  React.useEffect(() => {
-    // Clear previous SVG
-    d3.select("#chart").selectAll("*").remove();
-    
-    // Create the SVG
-    const svg = d3.select("#chart")
-      .append("svg")
-      .attr("width", width)
-      .attr("height", height)
-      .append("g")
-      .attr("transform", `translate(${margin.left}, ${margin.top})`);
-    
-    // Generate some sample data
-    const data = Array.from({ length: 20 }, (_, i) => ({
-      date: new Date(2023, 0, i + 1),
-      value: Math.random() * 1000
-    }));
-    
-    // Create scales
-    const xScale = d3.scaleTime()
-      .domain(d3.extent(data, d => d.date))
-      .range([0, width - margin.left - margin.right]);
-    
-    const yScale = d3.scaleLinear()
-      .domain([0, d3.max(data, d => d.value)])
-      .range([height - margin.top - margin.bottom, 0]);
-    
-    // Add X-axis
-    svg.append("g")
-      .attr("transform", `translate(0, ${height - margin.top - margin.bottom})`)
-      .call(d3.axisBottom(xScale))
-      .selectAll("text")
-      .style("text-anchor", "end")
-      .attr("dx", "-.8em")
-      .attr("dy", ".15em")
-      .attr("transform", "rotate(-45)");
-    
-    // Add Y-axis
-    svg.append("g")
-      .call(d3.axisLeft(yScale));
-    
-    // Add X-axis label
-    svg.append("text")
-      .attr("x", (width - margin.left - margin.right) / 2)
-      .attr("y", height - margin.top - margin.bottom + 50)
-      .style("text-anchor", "middle")
-      .text("Date");
-    
-    // Add Y-axis label
-    svg.append("text")
-      .attr("transform", "rotate(-90)")
-      .attr("x", -(height - margin.top - margin.bottom) / 2)
-      .attr("y", -60)
-      .style("text-anchor", "middle")
-      .text("Transaction Volume");
-    
-    // Add title
-    svg.append("text")
-      .attr("x", (width - margin.left - margin.right) / 2)
-      .attr("y", -20)
-      .style("text-anchor", "middle")
-      .style("font-size", "18px")
-      .text(titleText);
-    
-    // Create line generator
-    const line = d3.line()
-      .x(d => xScale(d.date))
-      .y(d => yScale(d.value))
-      .curve(d3.curveMonotoneX);
-    
-    // Add the line
-    svg.append("path")
-      .datum(data)
-      .attr("fill", "none")
-      .attr("stroke", "#46E4FD")
-      .attr("stroke-width", 2)
-      .attr("d", line);
-    
-    // Add circles for data points
-    svg.selectAll(".dot")
-      .data(data)
-      .enter()
-      .append("circle")
-      .attr("cx", d => xScale(d.date))
-      .attr("cy", d => yScale(d.value))
-      .attr("r", 5)
-      .attr("fill", "#D4A017");
-    
-  }, []);
-  
-  return (
-    <div id="chart" className="w-full h-full"></div>
-  );
-};
-"""
-        
-        # Save the sample template
-        with open(os.path.join(TEMPLATES_DIR, "sample_template.js"), "w", encoding="utf-8") as f:
-            f.write(sample_template)
-            
-        logger.info("Created sample template visualization")
-
-# Ensure templates exist at application startup
-ensure_template_files_exist()
+## ====== VISUALIZATION RELATED ======
 
 @app.get("/api/visualizations")
 async def list_visualizations():
@@ -247,6 +120,9 @@ async def get_visualization(file_path: str):
     except Exception as e:
         logger.error(f"Error retrieving visualization file: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+## ====== CONVERSATION RELATED ======
 
 @app.get("/api/conversations")
 async def list_conversations():
@@ -399,6 +275,8 @@ async def list_template_visualizations():
         logger.error(f"Error listing template visualizations: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+## MAIN FUNCTION
+
 @app.post("/api/process-prompt", response_model=Dict[str, Any])
 async def process_prompt(data: Dict[str, Any] = Body(...)):
     """
@@ -430,11 +308,6 @@ async def process_prompt(data: Dict[str, Any] = Body(...)):
         
         # 1. Select a template file from templates directory
         template_files = [f for f in os.listdir(TEMPLATES_DIR) if f.endswith('.js')]
-        if not template_files:
-            # Ensure we have template files
-            ensure_template_files_exist()
-            template_files = [f for f in os.listdir(TEMPLATES_DIR) if f.endswith('.js')]
-            
         if not template_files:
             raise HTTPException(status_code=500, detail="No template visualizations available")
             
