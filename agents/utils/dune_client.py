@@ -6,7 +6,7 @@ import pandas as pd
 from dune_client.client import DuneClient
 from dune_client.query import QueryBase
 from dune_client.types import QueryParameter
-from dune_client.models import QueryFailed, DuneError  # 导入正确的异常类
+from dune_client.models import QueryFailed  # 导入正确的异常类
 
 logger = logging.getLogger(__name__)
 
@@ -14,12 +14,6 @@ class DuneQueryClient:
     """Dune查询客户端，负责执行SQL查询并处理结果"""
     
     def __init__(self, api_key: str = None):
-        """
-        初始化Dune查询客户端
-        
-        Args:
-            api_key: Dune API密钥，如果不提供则从环境变量读取
-        """
         self.api_key = api_key or os.getenv("DUNE_API_KEY")
         if not self.api_key:
             raise ValueError("必须提供Dune API密钥")

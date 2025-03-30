@@ -1,0 +1,206 @@
+[
+    {
+        "table_name": "tokens.transfers",
+        "description": "This table contains detailed information about token transfers across various blockchains.",
+        "columns": {
+            "unique_key": {
+                "type": "varchar",
+                "description": "Surrogate key to identify unique row"
+            },
+            "blockchain": {
+                "type": "varchar",
+                "description": "The blockchain of the transfer"
+            },
+            "block_month": {
+                "type": "date",
+                "description": "The month of the block"
+            },
+            "block_date": {
+                "type": "date",
+                "description": "The date of the block"
+            },
+            "block_time": {
+                "type": "timestamp(3) with time zone",
+                "description": "The time of the block"
+            },
+            "block_number": {
+                "type": "bigint",
+                "description": "The block number"
+            },
+            "tx_hash": {
+                "type": "varbinary",
+                "description": "The transaction hash"
+            },
+            "evt_index": {
+                "type": "bigint",
+                "description": "The log event index of the transfer"
+            },
+            "trace_address": {
+                "type": "array(bigint)",
+                "description": "The trace address of the transfer"
+            },
+            "token_standard": {
+                "type": "varchar",
+                "description": "The token standard of the transfer"
+            },
+            "tx_from": {
+                "type": "varbinary",
+                "description": "The transaction sender"
+            },
+            "tx_to": {
+                "type": "varbinary",
+                "description": "The transaction receiver"
+            },
+            "tx_index": {
+                "type": "bigint",
+                "description": "The transaction index"
+            },
+            "from": {
+                "type": "varbinary",
+                "description": "The sender of the transfer"
+            },
+            "to": {
+                "type": "varbinary",
+                "description": "The receiver of the transfer"
+            },
+            "contract_address": {
+                "type": "varbinary",
+                "description": "The contract address of the transfer"
+            },
+            "symbol": {
+                "type": "varchar",
+                "description": "The token symbol transferred"
+            },
+            "amount_raw": {
+                "type": "uint256",
+                "description": "The raw amount of the transfer"
+            },
+            "amount": {
+                "type": "double",
+                "description": "The display amount of the transfer"
+            },
+            "price_usd": {
+                "type": "double",
+                "description": "The USD price used to calculate the amount_usd"
+            },
+            "amount_usd": {
+                "type": "double",
+                "description": "The USD amount of the transfer"
+            }
+        }
+    },
+    {
+        "table_name": "dex_aggregator.trades",
+        "description": "This table provides an overview of different DEX aggregators, their versions, supported chains, and recent swap activity.",
+        "columns": {
+            "project": {
+                "type": "varchar",
+                "description": "Name of the DEX aggregator project",
+                "examples": [
+                    "1inch",
+                    "0x API",
+                    "kyberswap",
+                    "odos",
+                    "paraswap"
+                ]
+            },
+            "versions": {
+                "type": "array(varchar)",
+                "description": "List of supported versions for each project",
+                "examples": [
+                    "AR v2, AR v3, AR v4, AR v5, AR v6",
+                    "1, settler",
+                    "meta_2"
+                ]
+            },
+            "chains_count": {
+                "type": "integer",
+                "description": "Number of supported blockchain networks",
+                "examples": [
+                    10,
+                    13,
+                    7,
+                    4,
+                    8
+                ]
+            },
+            "chains": {
+                "type": "array(varchar)",
+                "description": "List of supported blockchain networks (partial list)",
+                "examples": [
+                    "optimism",
+                    "polygon",
+                    "gnosis",
+                    "ethereum",
+                    "zksync"
+                ]
+            },
+            "swaps_7d": {
+                "type": "varchar",
+                "description": "Number of swaps in the last 7 days",
+                "examples": [
+                    "993.8k",
+                    "823.3k",
+                    "333.5k"
+                ]
+            }
+        }
+    },
+    {
+        "table_name": "dex_aggregator.trades",
+        "description": "This table provides an overview of different DEX aggregators, their versions, supported chains, and recent swap activity.",
+        "columns": {
+            "project": {
+                "type": "varchar",
+                "description": "Name of the DEX aggregator project",
+                "examples": [
+                    "1inch",
+                    "0x API",
+                    "kyberswap",
+                    "odos",
+                    "paraswap"
+                ]
+            },
+            "versions": {
+                "type": "array(varchar)",
+                "description": "List of supported versions for each project",
+                "examples": [
+                    "AR v2, AR v3, AR v4, AR v5, AR v6",
+                    "1, settler",
+                    "meta_2"
+                ]
+            },
+            "chains_count": {
+                "type": "integer",
+                "description": "Number of supported blockchain networks",
+                "examples": [
+                    10,
+                    13,
+                    7,
+                    4,
+                    8
+                ]
+            },
+            "chains": {
+                "type": "array(varchar)",
+                "description": "List of supported blockchain networks (partial list)",
+                "examples": [
+                    "optimism",
+                    "polygon",
+                    "gnosis",
+                    "ethereum",
+                    "zksync"
+                ]
+            },
+            "swaps_7d": {
+                "type": "varchar",
+                "description": "Number of swaps in the last 7 days",
+                "examples": [
+                    "993.8k",
+                    "823.3k",
+                    "333.5k"
+                ]
+            }
+        }
+    }
+]
