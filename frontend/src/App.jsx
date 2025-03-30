@@ -10,6 +10,7 @@ import React from "react";
 import { checkSubscription, subscribe } from './utils/contract';
 import { getConversations, getConversation, createConversation, getNodeBranch } from './utils/chatHistoryService';
 import { Visualization, LoadingVisualization } from './components/Visualization';
+import { downloadVisualizationImage } from './utils/imageDownloader';
 
 function App() {
   const { login, ready, authenticated, user, wallet } = usePrivy();
@@ -72,6 +73,33 @@ function App() {
 
   // State to track recently removed visualizations for animation
   const [removedVisualizations, setRemovedVisualizations] = useState([]);
+
+  // Helper function to get display name - moved from inline to a separate function
+  const getDisplayName = useCallback((path) => {
+    if (!path) return "";
+    
+    const parts = path.split('/');
+    if (parts.length > 1) {
+      // Path with user address
+      const fileName = parts[parts.length - 1];
+      const userAddress = parts[0];
+      
+      // Check if this is the current user's visualization
+      const currentWalletAddress = user?.wallet?.address || 'anonymous';
+      const currentUserAddress = currentWalletAddress.replace('0x', '').toLowerCase();
+      
+      if (userAddress === currentUserAddress) {
+        return `${fileName}`;
+      } else if (userAddress === 'templates') {
+        return `(Template) ${fileName}`;
+      } else {
+        return fileName;
+      }
+    } else {
+      // Just a filename
+      return path;
+    }
+  }, [user?.wallet?.address]);
 
   // Helper function to load a visualization component - moved inside the component
   const loadVisualizationComponent = useCallback(async (filePath, retries = 3, delay = 500) => {
@@ -147,6 +175,7 @@ function App() {
   // Function to refresh file explorer when new visualizations are created
   const refreshFileExplorer = useCallback(async (highlightFiles = null) => {
     console.log("Starting refreshFileExplorer with:", highlightFiles);
+    let filePathList = []
     try {
       // Get wallet address
       const walletAddress = user?.wallet?.address || 'anonymous';
@@ -166,13 +195,13 @@ function App() {
       
       // Add user's visualization files with a prefix to distinguish them
       userData.files.forEach(fileName => {
-        newFileStructure.visualizations[`(My) ${fileName}`] = null;
+        newFileStructure.visualizations[`${fileName}`] = null;
       });
       
-      // Add template visualization files
-      templatesData.files.forEach(fileName => {
-        newFileStructure.visualizations[`(Template) ${fileName}`] = null;
-      });
+      // // Add template visualization files
+      // templatesData.files.forEach(fileName => {
+      //   newFileStructure.visualizations[`(Template) ${fileName}`] = null;
+      // });
       
       console.log("Setting file structure and handling highlights");
       // Batch these updates together by using a function to update the state
@@ -225,13 +254,88 @@ function App() {
           setTimeout(() => {
             setNewestVisualization(null);
           }, 4000);
+          
+          
+          // Wait for visualizations to render then download images
+          setTimeout(async () => {
+            for (const vizPath of newVisualizations) {
+              try {
+                const displayName = getDisplayName(vizPath);
+                console.log(`Attempting to download image for: ${displayName}`);
+                
+                // Use the ID we added to the visualization component
+                const vizId = `viz-${vizPath.replace(/[^a-zA-Z0-9]/g, "-")}`;
+                const vizSelector = `#${vizId} .visualization-container`;
+                console.log("hello")
+                const filePath = await downloadVisualizationImage(vizSelector, displayName);
+                console.log("filePath returned by downloadVisualizationImage", filePath);
+                filePathList.push(filePath);
+              } catch (err) {
+                console.error(`Error downloading image for ${vizPath}:`, err);
+              }
+            }
+            console.log("filePathList", filePathList);
+            if (filePathList.length > 0) {
+              // Call the process_prompt API to analyze the figure, send the file paths to the backend
+              try {
+                console.log("Preparing to send data:", { 
+                  prompt, 
+                  filePaths: filePathList, 
+                  walletAddress: user?.wallet?.address 
+                });
+                
+                const response = await fetch(`http://localhost:8000/api/analyze-data`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                  },
+                  body: JSON.stringify({ 
+                    prompt, 
+                    filePaths: filePathList, 
+                    walletAddress: user?.wallet?.address 
+                  })
+                });
+                
+                if (!response.ok) {
+                  const errorText = await response.text();
+                  console.error("Error response from server:", response.status, errorText);
+                  throw new Error(`Server responded with ${response.status}: ${errorText}`);
+                }
+                
+                const data = await response.json();
+                console.log("Response from processPrompt:", data);
+                
+                // Add the analysis as a new AI message in the chat pane
+                if (data && data.analysis) {
+                  // Create a new AI message with the analysis content
+                  const analysisMessage = {
+                    text: data.analysis,
+                    sender: 'ai',
+                    timestamp: new Date().toISOString()
+                  };
+                  
+                  // Add the analysis message to the chat
+                  setMessages(prevMessages => [...prevMessages, analysisMessage]);
+                  
+                  console.log("Added analysis as a new message:", analysisMessage);
+                }
+              } catch (error) {
+                console.error("Error calling processPrompt:", error);
+                // Handle error here
+              }
+            }
+          }, 1000); // Wait 1 second for rendering to complete
         }
       }
+      
     } catch (error) {
       console.error('Error refreshing visualization files:', error);
       showToast("Failed to refresh file explorer", null);
     }
-  }, [user?.wallet?.address, isFileExplorerOpen, selectedVisualizations, loadVisualizationComponent]);
+  }, [user?.wallet?.address, isFileExplorerOpen, selectedVisualizations, loadVisualizationComponent, getDisplayName]);
+
+  
 
   // Function to show toast
   const showToast = (message, txHash = null) => {
@@ -305,6 +409,8 @@ function App() {
       setFileStructure({ visualizations: {} });
       setSelectedVisualizations([]);
       setVisualizationComponents({});
+
+      console.log("Checking subscription status for user");
       
       if (authenticated && user?.wallet?.address && wallets.length > 0) {
         try {
@@ -347,13 +453,11 @@ function App() {
     const fileName = path.split("/").pop();
   
     // Determine if this is a user visualization or template based on prefix
-    const isUserViz = fileName.startsWith("(My)");
+    const isUserViz = !fileName.startsWith("(Template)");
     const isTemplateViz = fileName.startsWith("(Template)");
     
     // Get the actual filename without prefix
-    const actualFileName = isUserViz || isTemplateViz
-      ? fileName.split(") ")[1] // Remove the prefix
-      : fileName;
+    const actualFileName = fileName;
     
     // Build the correct backend path
     let backendPath;
@@ -690,33 +794,6 @@ function App() {
       throw error;
     }
   }, [activeConversationId, activeNodeId, refreshFileExplorer, user?.wallet?.address]);
-
-  // Helper function to get display name - moved from inline to a separate function
-  const getDisplayName = useCallback((path) => {
-    if (!path) return "";
-    
-    const parts = path.split('/');
-    if (parts.length > 1) {
-      // Path with user address
-      const fileName = parts[parts.length - 1];
-      const userAddress = parts[0];
-      
-      // Check if this is the current user's visualization
-      const currentWalletAddress = user?.wallet?.address || 'anonymous';
-      const currentUserAddress = currentWalletAddress.replace('0x', '').toLowerCase();
-      
-      if (userAddress === currentUserAddress) {
-        return `${fileName}`;
-      } else if (userAddress === 'templates') {
-        return `(Template) ${fileName}`;
-      } else {
-        return fileName;
-      }
-    } else {
-      // Just a filename
-      return path;
-    }
-  }, [user?.wallet?.address]);
 
   // Use useMemo to compute the list of visualizations to render
   const visualizationsToRender = useMemo(() => {
