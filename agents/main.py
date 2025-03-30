@@ -8,6 +8,7 @@ from agents.utils.dune_client import DuneQueryClient
 from agents.planner import Planner
 from agents.plotter import PlotterAgent
 import concurrent.futures
+from figure_analyzer import AnalyzeFigureAgent
 
 dspy.disable_litellm_logging()
 dspy.disable_logging()
@@ -41,9 +42,19 @@ def plot_graph(prompt: str, task: str, csv_filepath: str):
     viz_code = plotter.plot_by_prompt(prompt, task, file_name, description, sample_data)
     return viz_code
 
+<<<<<<< HEAD
 from agents.temp.temp_agent import temp_mock_agent
 def main(prompt: str, csv_dir: str, viz_dir: str):
     
+=======
+
+def analyze_figure(prompt: str, attachments: list[str]):
+    analyzer = AnalyzeFigureAgent()
+    return analyzer.analyze_figures(attachments, prompt)
+
+
+def generate_figures(prompt: str, csv_dir: str, viz_dir: str):
+>>>>>>> agents
     os.makedirs(csv_dir, exist_ok=True)
     os.makedirs(viz_dir, exist_ok=True)
     
@@ -130,6 +141,13 @@ def main(prompt: str, csv_dir: str, viz_dir: str):
     results = temp_mock_agent(prompt, csv_dir, viz_dir)
 
     return results
+
+
+def main(prompt: str, csv_dir: str, viz_dir: str, attachments: list[str] = None):
+    if attachments:
+        return analyze_figure(prompt, attachments)
+    else:
+        return generate_figures(prompt, csv_dir, viz_dir)
 
 
 if __name__ == "__main__":
