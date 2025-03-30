@@ -3,7 +3,7 @@ import FileExplorer from './components/FileExplorer'
 import Chat from './components/Chat'
 import Toast from './components/Toast'
 import ChatHistory from './components/ChatHistory'
-import { FaFolder, FaComments, FaChevronRight, FaChevronLeft, FaChevronDown, FaChevronUp, FaCrown, FaToggleOn, FaSignOutAlt, FaHistory } from 'react-icons/fa'
+import { FaFolder, FaComments, FaChevronRight, FaChevronLeft, FaChevronDown, FaChevronUp, FaCrown, FaToggleOn, FaSignOutAlt, FaHistory, FaGripLinesVertical } from 'react-icons/fa'
 import { usePrivy, useWallets, useLogout } from '@privy-io/react-auth'
 import * as d3 from "d3";
 import React from "react";
@@ -23,6 +23,18 @@ function App() {
   });
   const [isFileExplorerOpen, setIsFileExplorerOpen] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
+  const [leftPaneWidth, setLeftPaneWidth] = useState(240) // Default width in pixels
+  const [isDragging, setIsDragging] = useState(false)
+  const [isAtMinWidth, setIsAtMinWidth] = useState(false)
+  const [isAtMaxWidth, setIsAtMaxWidth] = useState(false)
+  const minLeftPaneWidth = 180 // Minimum width for the left pane
+  const maxLeftPaneWidth = 400 // Maximum width for the left pane
+  const [chatPaneWidth, setChatPaneWidth] = useState(800) // Default chat pane width
+  const [isChatDragging, setIsChatDragging] = useState(false)
+  const [isChatAtMinWidth, setIsChatAtMinWidth] = useState(false)
+  const [isChatAtMaxWidth, setIsChatAtMaxWidth] = useState(false)
+  const minChatPaneWidth = 500 // Minimum chat pane width
+  const maxChatPaneWidth = 1200 // Maximum chat pane width
   const [selectedVisualizations, setSelectedVisualizations] = useState([])
   const [visualizationComponents, setVisualizationComponents] = useState({})
   const [newestVisualization, setNewestVisualization] = useState(null)
@@ -437,6 +449,103 @@ function App() {
     }, 10);
   };
 
+  // Add resize functionality
+  const handleResizeStart = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+    
+    // Capture initial mouse position and pane width
+    const startX = e.clientX;
+    const startWidth = leftPaneWidth;
+    
+    const handleMouseMove = (mouseMoveEvent) => {
+      mouseMoveEvent.preventDefault();
+      
+      // Calculate new width based on mouse movement
+      let newWidth = startWidth + (mouseMoveEvent.clientX - startX);
+      
+      // Check if at min or max boundaries before clamping
+      setIsAtMinWidth(newWidth <= minLeftPaneWidth);
+      setIsAtMaxWidth(newWidth >= maxLeftPaneWidth);
+      
+      // Apply min/max constraints after calculating the drag distance
+      newWidth = Math.min(Math.max(newWidth, minLeftPaneWidth), maxLeftPaneWidth);
+      
+      // Update pane width
+      setLeftPaneWidth(newWidth);
+    };
+    
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      
+      // Keep the handle visible briefly after releasing
+      setTimeout(() => {
+        setIsDragging(false);
+      }, 100);
+      
+      // Reset boundary states after 1 second
+      setTimeout(() => {
+        setIsAtMinWidth(false);
+        setIsAtMaxWidth(false);
+      }, 1000);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+  
+  // Add resize functionality for chat pane
+  const handleChatResizeStart = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsChatDragging(true);
+    
+    // Capture initial mouse position and pane width
+    const startX = e.clientX;
+    const startWidth = chatPaneWidth;
+    
+    const handleMouseMove = (mouseMoveEvent) => {
+      mouseMoveEvent.preventDefault();
+      
+      // Calculate width change
+      const dx = mouseMoveEvent.clientX - startX;
+      
+      // Resize from both sides - pull left or right
+      let newWidth = startWidth + dx * 2;
+      
+      // Check if at min or max boundaries before clamping
+      setIsChatAtMinWidth(newWidth <= minChatPaneWidth);
+      setIsChatAtMaxWidth(newWidth >= maxChatPaneWidth);
+      
+      // Apply min/max constraints
+      newWidth = Math.min(Math.max(newWidth, minChatPaneWidth), maxChatPaneWidth);
+      
+      // Update chat pane width
+      setChatPaneWidth(newWidth);
+    };
+    
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      setIsChatDragging(false);
+      
+      // Reset boundary states after 1 second
+      setTimeout(() => {
+        setIsChatAtMinWidth(false);
+        setIsChatAtMaxWidth(false);
+      }, 1000);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  // Update CSS variable when chat width changes
+  useEffect(() => {
+    document.documentElement.style.setProperty('--chat-width', `${chatPaneWidth}px`);
+  }, [chatPaneWidth]);
+
   // If Privy is not ready, show loading state
   if (!ready) {
     return (
@@ -465,119 +574,138 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden global-scrollbar-styles">
-      {/* Left Pane with Tabs */}
-      <div className={`flex h-full transition-all duration-300 ${isFileExplorerOpen ? 'w-60' : 'w-12'}`}>
-        <div className={`h-full flex flex-col ${isFileExplorerOpen ? 'w-full bg-[#22222E]' : 'w-12 bg-[#22222E]'}`}>
-          {isFileExplorerOpen ? (
-            // Full Left Pane with Tabs
-            <>
-              {/* Tabs Navigation */}
-              <div className="flex border-b border-[#1A1A24]">
-                <button 
-                  onClick={() => setActiveTab('files')}
-                  className={`flex-1 px-4 py-2 text-sm ${activeTab === 'files' ? 'text-white border-b-2 border-[#D4A017]' : 'text-gray-400 hover:text-white'}`}
-                >
-                  <div className="flex items-center justify-center">
-                    <FaFolder className="w-4 h-4 mr-2" />
-                    Files
-                  </div>
-                </button>
-                <button 
-                  onClick={() => setActiveTab('history')}
-                  className={`flex-1 px-4 py-2 text-sm ${activeTab === 'history' ? 'text-white border-b-2 border-[#D4A017]' : 'text-gray-400 hover:text-white'}`}
-                >
-                  <div className="flex items-center justify-center">
-                    <FaHistory className="w-4 h-4 mr-2" />
-                    History
-                  </div>
-                </button>
-                <button 
-                  onClick={() => setIsFileExplorerOpen(false)}
-                  className="w-8 flex items-center justify-center text-gray-400 hover:text-white"
-                >
-                  <FaChevronLeft />
-                </button>
-              </div>
-
-              {/* Tab Content */}
-              <div className="flex-1 overflow-auto custom-scrollbar">
-                {activeTab === 'files' ? (
-                  // File Explorer Content
-                  <div className="p-4">
-                    <FileExplorer 
-                      fileStructure={fileStructure} 
-                      onFileSelect={handleVisualizationSelect}
-                      activeVisualizations={selectedVisualizations}
-                    />
-                  </div>
-                ) : (
-                  // Chat History Content
-                  <div className="p-4">
-                    {isLoadingHistory ? (
-                      <div className="text-center text-gray-400 py-4">
-                        Loading history...
-                      </div>
-                    ) : (
-                      <ChatHistory 
-                        conversations={chatHistory}
-                        onNodeSelect={handleChatNodeSelect}
-                        activeNodeId={activeNodeId}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Bottom Section with Subscription Status */}
-              <div className="border-t border-[#1A1A24] p-4">
-                <div className="flex flex-col gap-3">
-                  {/* Wallet Address */}
-                  <div className="text-sm text-gray-400 break-all">
-                    {user?.wallet?.address ? 
-                      `${user.wallet.address.slice(0, 6)}...${user.wallet.address.slice(-4)}` : 
-                      'No wallet connected'}
-                  </div>
-                  {/* Subscription Status */}
-                  {hasSubscription ? (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm text-[#D4A017]">
-                        <FaCrown className="w-4 h-4" />
-                        <span>Premium until {subscriptionExpiry?.toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <button
-                        onClick={handleSubscribe}
-                        className="flex items-center justify-center gap-2 px-4 py-2 bg-[#D4A017] text-white rounded-lg hover:bg-[#B38A14] transition-colors text-sm"
-                      >
-                        <FaCrown className="w-4 h-4" />
-                        Subscribe Now
-                      </button>
-                    </div>
-                  )}
-                  {/* Logout Button */}
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-[#2D2D3B] text-gray-400 hover:text-white hover:bg-[#3C3C4E] rounded-lg transition-colors text-sm mt-2"
+      {/* Left Pane Container with Tabs and Resize Handle */}
+      <div className="flex h-full">
+        {/* Left Pane Content */}
+        <div className={`${isFileExplorerOpen ? 'left-pane' : 'w-12'} ${isDragging ? 'dragging' : 'transition-all duration-300'}`} 
+             style={{ width: isFileExplorerOpen ? `${leftPaneWidth}px` : '48px' }}>
+          <div className={`h-full flex flex-col ${isFileExplorerOpen ? 'w-full bg-[#22222E]' : 'w-12 bg-[#22222E]'}`}>
+            {isFileExplorerOpen ? (
+              // Full Left Pane with Tabs
+              <>
+                {/* Tabs Navigation */}
+                <div className="flex border-b border-[#1A1A24]">
+                  <button 
+                    onClick={() => setActiveTab('files')}
+                    className={`flex-1 px-4 py-2 text-sm ${activeTab === 'files' ? 'text-white border-b-2 border-[#D4A017]' : 'text-gray-400 hover:text-white'}`}
                   >
-                    <FaSignOutAlt className="w-4 h-4" />
-                    Logout
+                    <div className="flex items-center justify-center">
+                      <FaFolder className="w-4 h-4 mr-2" />
+                      Files
+                    </div>
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('history')}
+                    className={`flex-1 px-4 py-2 text-sm ${activeTab === 'history' ? 'text-white border-b-2 border-[#D4A017]' : 'text-gray-400 hover:text-white'}`}
+                  >
+                    <div className="flex items-center justify-center">
+                      <FaHistory className="w-4 h-4 mr-2" />
+                      History
+                    </div>
+                  </button>
+                  <button 
+                    onClick={() => setIsFileExplorerOpen(false)}
+                    className="w-8 flex items-center justify-center text-gray-400 hover:text-white"
+                  >
+                    <FaChevronLeft />
                   </button>
                 </div>
-              </div>
-            </>
-          ) : (
-            // Icon Only View
-            <button
-              onClick={() => setIsFileExplorerOpen(true)}
-              className="w-full flex flex-col items-center py-4"
-            >
-              <div className="text-white hover:text-[#ABA9BF] transition-colors p-2 rounded flex items-center gap-2" title="Open Explorer (Ctrl+B)">
-                <FaFolder className="w-6 h-6" />
-              </div>
-            </button>
-          )}
+  
+                {/* Tab Content */}
+                <div className="flex-1 overflow-auto custom-scrollbar">
+                  {activeTab === 'files' ? (
+                    // File Explorer Content
+                    <div className="p-4">
+                      <FileExplorer 
+                        fileStructure={fileStructure} 
+                        onFileSelect={handleVisualizationSelect}
+                        activeVisualizations={selectedVisualizations}
+                      />
+                    </div>
+                  ) : (
+                    // Chat History Content
+                    <div className="p-4">
+                      {isLoadingHistory ? (
+                        <div className="text-center text-gray-400 py-4">
+                          Loading history...
+                        </div>
+                      ) : (
+                        <ChatHistory 
+                          conversations={chatHistory}
+                          onNodeSelect={handleChatNodeSelect}
+                          activeNodeId={activeNodeId}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+  
+                {/* Bottom Section with Subscription Status */}
+                <div className="border-t border-[#1A1A24] p-4">
+                  <div className="flex flex-col gap-3">
+                    {/* Wallet Address */}
+                    <div className="text-sm text-gray-400 break-all">
+                      {user?.wallet?.address ? 
+                        `${user.wallet.address.slice(0, 6)}...${user.wallet.address.slice(-4)}` : 
+                        'No wallet connected'}
+                    </div>
+                    {/* Subscription Status */}
+                    {hasSubscription ? (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm text-[#D4A017]">
+                          <FaCrown className="w-4 h-4" />
+                          <span>Premium until {subscriptionExpiry?.toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <button
+                          onClick={handleSubscribe}
+                          className="flex items-center justify-center gap-2 px-4 py-2 bg-[#D4A017] text-white rounded-lg hover:bg-[#B38A14] transition-colors text-sm"
+                        >
+                          <FaCrown className="w-4 h-4" />
+                          Subscribe Now
+                        </button>
+                      </div>
+                    )}
+                    {/* Logout Button */}
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center justify-center gap-2 px-4 py-2 bg-[#2D2D3B] text-gray-400 hover:text-white hover:bg-[#3C3C4E] rounded-lg transition-colors text-sm mt-2"
+                    >
+                      <FaSignOutAlt className="w-4 h-4" />
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              // Icon Only View
+              <button
+                onClick={() => setIsFileExplorerOpen(true)}
+                className="w-full flex flex-col items-center py-4"
+              >
+                <div className="text-white hover:text-[#ABA9BF] transition-colors p-2 rounded flex items-center gap-2" title="Open Explorer (Ctrl+B)">
+                  <FaFolder className="w-6 h-6" />
+                </div>
+              </button>
+            )}
+          </div>
+        </div>
+        
+        {/* Resize Handle */}
+        <div 
+          className={`resize-handle h-full relative z-20 group 
+            ${isDragging ? 'bg-[#D4A017]' : 'bg-[#1A1A24] hover:bg-[#D4A017]'}
+            ${isAtMinWidth ? 'min-width-indicator' : ''}
+            ${isAtMaxWidth ? 'max-width-indicator' : ''}
+            ${!isFileExplorerOpen ? 'opacity-0 pointer-events-none' : ''}`}
+          onMouseDown={handleResizeStart}
+          title="Drag to resize"
+        >
+          <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 flex justify-center opacity-0 group-hover:opacity-100 text-[#D4A017]">
+            <FaGripLinesVertical />
+          </div>
         </div>
       </div>
 
@@ -650,9 +778,22 @@ function App() {
       )}
 
       {/* Terminal-like Chat Box - Now floating over the canvas */}
-      <div className={`fixed bottom-4 left-1/2 transform -translate-x-1/2 w-[800px] bg-[#22222E] rounded-lg shadow-lg transition-all duration-300 ${
+      <div className={`fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-[#22222E] rounded-lg shadow-lg chat-pane-overlay ${
         isChatOpen ? 'h-[300px] opacity-100 chat-active' : 'h-0 opacity-0 pointer-events-none'
-      } ${isChatCollapsing ? 'chat-collapse' : ''} z-50 chat-pane-overlay`}>
+      } ${isChatCollapsing ? 'chat-collapse' : ''} ${isChatDragging ? 'dragging' : ''}`}
+        style={{ width: `${chatPaneWidth}px` }}>
+        
+        {/* Drag handle at top of chat box */}
+        <div 
+          className={`absolute -top-2 left-1/2 transform -translate-x-1/2 w-20 h-5 cursor-move rounded-t-md flex items-center justify-center group
+            ${isChatDragging ? 'bg-[#D4A017]' : 'bg-[#2D2D3B]'}
+            ${isChatAtMinWidth ? 'chat-min-width-indicator' : ''}
+            ${isChatAtMaxWidth ? 'chat-max-width-indicator' : ''}`}
+          onMouseDown={handleChatResizeStart}
+        >
+          <div className="w-8 h-1 bg-[#1A1A24] rounded-full group-hover:bg-[#D4A017]"></div>
+        </div>
+        
         <button
           onClick={() => setIsChatOpen(!isChatOpen)}
           className={`w-full flex items-center justify-between px-4 py-2 bg-[#2D2D3B] rounded-t-lg text-white hover:bg-[#3C3C4E] transition-colors border-b border-[#1A1A24] ${
@@ -690,6 +831,11 @@ function App() {
           txHash={toast.txHash} 
           onClose={hideToast} 
         />
+      )}
+
+      {/* Overlay when dragging to improve UX */}
+      {(isDragging || isChatDragging) && (
+        <div className="dragging-overlay" />
       )}
     </div>
   )

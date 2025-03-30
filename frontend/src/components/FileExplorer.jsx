@@ -40,14 +40,14 @@ const FileExplorer = ({ fileStructure, onFileSelect, activeVisualizations = [] }
       const isActive = activeVisualizations.includes(fileName);
       
       return (
-        <div key={currentPath} className="">
+        <div key={currentPath} className="w-full">
           <div 
             className={`flex items-center py-1 cursor-pointer hover:bg-[#3C93FD]/10 rounded transition-colors
               ${isFolder ? 'text-gray-100' : 'text-gray-300'}
               ${isActive ? 'bg-[#3C93FD]/20 text-[#46E4FD]' : ''}`}
             onClick={() => isFolder ? toggleFolder(currentPath) : handleFileSelect(currentPath)}
           >
-            <span className="mr-1 flex items-center">
+            <span className="mr-1 flex-shrink-0 flex items-center">
               {isFolder ? (
                 <>
                   {isExpanded ? 
@@ -63,10 +63,10 @@ const FileExplorer = ({ fileStructure, onFileSelect, activeVisualizations = [] }
                 <FaFile className={`w-4 h-4 ml-4 ${isActive ? 'text-[#46E4FD]' : ''}`} />
               )}
             </span>
-            <span className="ml-1 text-sm">{name}</span>
+            <span className="ml-1 text-sm truncate" title={name}>{name}</span>
           </div>
           {isFolder && isExpanded && (
-            <div className="ml-2">
+            <div className="ml-2 w-full">
               {renderFileTree(content, currentPath)}
             </div>
           )}
@@ -76,7 +76,7 @@ const FileExplorer = ({ fileStructure, onFileSelect, activeVisualizations = [] }
   };
 
   return (
-    <div className="text-sm">
+    <div className="text-sm w-full overflow-hidden">
       {renderFileTree(fileStructure)}
     </div>
   );

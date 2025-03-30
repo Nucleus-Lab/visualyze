@@ -1,8 +1,32 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 
 const ChatHistory = ({ conversations, onNodeSelect, activeNodeId }) => {
   const svgRef = useRef(null);
+  const containerRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  
+  // Update container width on resize
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.clientWidth);
+      }
+    };
+
+    // Initial measurement
+    updateDimensions();
+    
+    // Add resize observer to handle parent container resizing
+    const resizeObserver = new ResizeObserver(updateDimensions);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+    
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
   
   // If no conversations yet
   if (!conversations || conversations.length === 0) {
@@ -64,11 +88,11 @@ const ChatHistory = ({ conversations, onNodeSelect, activeNodeId }) => {
     // Clear previous visualization
     d3.select(`#timeline-${conversationId}`).selectAll("*").remove();
     
-    // Calculate dimensions
+    // Calculate dimensions - use dynamic width based on container
+    const width = containerWidth - 20; // Add some padding
     const nodeRadius = 6;
     const nodeHeight = 32;
     const height = moments.length * nodeHeight;
-    const width = 280;
     const lineStartX = 25;
     
     // Create SVG if it doesn't exist
@@ -130,15 +154,23 @@ const ChatHistory = ({ conversations, onNodeSelect, activeNodeId }) => {
       .attr("stroke-width", 1)
       .attr("fill", d => d.id === activeNodeId ? "#D4A017" : "transparent");
     
-    // Add text labels
+    // Add text labels with truncation based on container width
     nodes.append("text")
       .attr("x", lineStartX + nodeRadius * 2 + 10)
       .attr("y", 8)  // Small adjustment for vertical centering
       .attr("fill", d => d.id === activeNodeId ? "#FFFFFF" : "#9CA3AF")
-      .style("font-size", "18px")
+      .style("font-size", "0.875rem")
       .text(d => {
-        const preview = d.content.split(' ').slice(0, 6).join(' ');
-        return preview + (d.content.split(' ').length > 6 ? '...' : '');
+        // Calculate available width for text
+        const availableWidth = width - (lineStartX + nodeRadius * 2 + 20);
+        const maxChars = Math.floor(availableWidth / 7); // Approximate chars per pixel
+        
+        // Truncate text if needed
+        let preview = d.content.slice(0, maxChars);
+        if (d.content.length > maxChars) {
+          preview = preview + "...";
+        }
+        return preview;
       });
     
     // Add hover effect for inactive nodes
@@ -159,9 +191,9 @@ const ChatHistory = ({ conversations, onNodeSelect, activeNodeId }) => {
       });
   };
   
-  // Effect to render D3 visualization when data changes
+  // Effect to render D3 visualization when data changes or container width changes
   useEffect(() => {
-    if (conversations && conversations.length > 0) {
+    if (conversations && conversations.length > 0 && containerWidth > 0) {
       conversations.forEach(conversation => {
         const moments = processNodes(conversation.nodes);
         const rootNode = conversation.nodes.find(n => n.type === "root");
@@ -170,17 +202,17 @@ const ChatHistory = ({ conversations, onNodeSelect, activeNodeId }) => {
         }
       });
     }
-  }, [conversations, activeNodeId]);
+  }, [conversations, activeNodeId, containerWidth]);
   
   return (
-    <div className="chat-history custom-scrollbar">
+    <div className="chat-history custom-scrollbar" ref={containerRef}>
       {conversations.map(conversation => {
         const moments = processNodes(conversation.nodes);
         
         return (
-          <div key={conversation.id} className="mb-6">
+          <div key={conversation.id} className="mb-6 w-full">
             {/* D3.js timeline visualization */}
-            <div className="d3-timeline-container">
+            <div className="d3-timeline-container w-full">
               <svg id={`timeline-${conversation.id}`} className="w-full"></svg>
             </div>
           </div>
