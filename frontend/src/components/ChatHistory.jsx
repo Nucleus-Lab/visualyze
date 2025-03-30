@@ -173,7 +173,7 @@ const ChatHistory = ({ conversations, onNodeSelect, activeNodeId }) => {
   }, [conversations, activeNodeId]);
   
   return (
-    <div className="chat-history">
+    <div className="chat-history custom-scrollbar">
       {conversations.map(conversation => {
         const moments = processNodes(conversation.nodes);
         

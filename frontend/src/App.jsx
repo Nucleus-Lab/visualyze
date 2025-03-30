@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import FileExplorer from './components/FileExplorer'
 import Chat from './components/Chat'
 import Toast from './components/Toast'
@@ -25,6 +25,8 @@ function App() {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [selectedVisualizations, setSelectedVisualizations] = useState([])
   const [visualizationComponents, setVisualizationComponents] = useState({})
+  const [newestVisualization, setNewestVisualization] = useState(null)
+  const newestVizRef = useRef(null)
   const [fileStructure, setFileStructure] = useState({
     visualizations: {}
   })
@@ -43,6 +45,18 @@ function App() {
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // State to track when chat is collapsing
+  const [isChatCollapsing, setIsChatCollapsing] = useState(false);
+  // State to track when visualization is expanding
+  const [isVizExpanding, setIsVizExpanding] = useState(false);
+
+  // State to track animations for visualizations
+  const [removingViz, setRemovingViz] = useState(null);
+  const [addingViz, setAddingViz] = useState(null);
+
+  // State to track recently removed visualizations for animation
+  const [removedVisualizations, setRemovedVisualizations] = useState([]);
 
   // Function to refresh file explorer when new visualizations are created
   const refreshFileExplorer = async (highlightFile = null) => {
@@ -69,18 +83,59 @@ function App() {
         setIsFileExplorerOpen(true)
       }
       
-      // If a specific file should be highlighted, select it
+      // If a specific file should be highlighted, select it and display it in the canvas
       if (highlightFile && data.files.includes(highlightFile)) {
-        handleVisualizationSelect(`visualizations/${highlightFile}`)
-        
-        // Show a toast notification
-        showToast(`New visualization created: ${highlightFile}`)
+        // Add to selected visualizations if not already included
+        if (!selectedVisualizations.includes(highlightFile)) {
+          // Always add the new visualization to existing ones, don't replace
+          setSelectedVisualizations(prev => [...prev, highlightFile])
+          
+          // Load visualization component if not already loaded
+          loadVisualizationComponent(highlightFile)
+          
+          // Set as newest visualization for highlighting
+          setNewestVisualization(highlightFile)
+          
+          // Clear the highlight after 4 seconds
+          setTimeout(() => {
+            setNewestVisualization(null)
+          }, 4000)
+        }
       }
     } catch (error) {
       console.error('Error refreshing visualization files:', error)
       showToast("Failed to refresh file explorer", null)
     }
   }
+  
+  // Helper function to load a visualization component
+  const loadVisualizationComponent = async (fileName) => {
+    if (!visualizationComponents[fileName]) {
+      try {
+        // Fetch JS code from backend
+        const response = await fetch(`http://localhost:8000/api/visualizations/${fileName}`);
+        const data = await response.json();
+
+        console.log("Fetched JS Code for:", fileName);
+
+        // Dynamically evaluate the JS code received
+        const component = new Function("React", "d3", `
+          ${data.content}
+          return GeneratedViz;  // Return the component directly
+        `)(React, d3);
+
+        // Store the evaluated component in state
+        setVisualizationComponents(prev => ({
+          ...prev,
+          [fileName]: component,
+        }));
+
+        console.log("Loaded Visualization Component:", fileName);
+      } catch (error) {
+        console.error("Error loading visualization:", fileName, error);
+      }
+    }
+  };
 
   // Function to show toast
   const showToast = (message, txHash = null) => {
@@ -165,40 +220,48 @@ function App() {
     checkUserSubscription();
   }, [authenticated, user?.wallet?.address, wallets]);
 
+  // Effect to scroll to the newest visualization when it's created
+  useEffect(() => {
+    if (newestVisualization && newestVizRef.current) {
+      // Add a small delay to ensure the DOM has updated
+      setTimeout(() => {
+        newestVizRef.current.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 100);
+    }
+  }, [newestVisualization]);
+
   const handleVisualizationSelect = async (path) => {
     console.log("Selected visualization:", path);
     const fileName = path.split("/").pop();
   
     if (selectedVisualizations.includes(fileName)) {
+      // Mark this visualization as removing for animation
+      setRemovingViz(fileName);
+      // Add to removed list to keep it around during animation
+      setRemovedVisualizations(prev => [...prev, fileName]);
+      
+      // Deselect visualization
       setSelectedVisualizations((prev) => prev.filter((viz) => viz !== fileName));
+      setRemovingViz(null);
+      
+      // Remove from the removed list after animation completes 
+      setRemovedVisualizations(prev => prev.filter(v => v !== fileName));
     } else {
+      // Select visualization
       setSelectedVisualizations((prev) => [...prev, fileName]);
+      setAddingViz(fileName);
+      
+      // Use the loadVisualizationComponent helper
+      await loadVisualizationComponent(fileName);
+      
+      // Clear animation state after animation completes
+      setTimeout(() => {
+        setAddingViz(null);
+      }, 500);
   
-      if (!visualizationComponents[fileName]) {
-        try {
-          // Fetch JS code from backend
-          const response = await fetch(`http://localhost:8000/api/visualizations/${fileName}`);
-          const data = await response.json();
-  
-          console.log("Fetched JS Code:", data.content);
-  
-          // Dynamically evaluate the JS code received
-          const component = new Function("React", "d3", `
-            ${data.content}
-            return GeneratedViz;  // Return the component directly
-          `)(React, d3);
-  
-          // Store the evaluated component in state
-          setVisualizationComponents((prev) => ({
-            ...prev,
-            [fileName]: component,
-          }));
-  
-          console.log("Loaded Visualization Component:", fileName);
-        } catch (error) {
-          console.error("Error loading visualization:", fileName, error);
-        }
-      }
     }
   };
 
@@ -340,6 +403,22 @@ function App() {
     }
   };
 
+  // Function to collapse/hide the chat pane with animation
+  const collapseChat = () => {
+    setIsChatCollapsing(true);
+    setIsVizExpanding(true);
+    
+    // After animation completes, actually hide the chat
+    setTimeout(() => {
+      setIsChatOpen(false);
+      setIsChatCollapsing(false);
+      // Allow time for the visualization expansion effect
+      setTimeout(() => {
+        setIsVizExpanding(false);
+      }, 500);
+    }, 500);
+  };
+
   // If Privy is not ready, show loading state
   if (!ready) {
     return (
@@ -367,7 +446,7 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
+    <div className="flex h-screen w-screen overflow-hidden global-scrollbar-styles">
       {/* Left Pane with Tabs */}
       <div className={`flex h-full transition-all duration-300 ${isFileExplorerOpen ? 'w-60' : 'w-12'}`}>
         <div className={`h-full flex flex-col ${isFileExplorerOpen ? 'w-full bg-[#22222E]' : 'w-12 bg-[#22222E]'}`}>
@@ -403,13 +482,14 @@ function App() {
               </div>
 
               {/* Tab Content */}
-              <div className="flex-1 overflow-auto">
+              <div className="flex-1 overflow-auto custom-scrollbar">
                 {activeTab === 'files' ? (
                   // File Explorer Content
                   <div className="p-4">
                     <FileExplorer 
                       fileStructure={fileStructure} 
                       onFileSelect={handleVisualizationSelect}
+                      activeVisualizations={selectedVisualizations}
                     />
                   </div>
                 ) : (
@@ -484,28 +564,45 @@ function App() {
       </div>
 
       {/* Canvas */}
-      <div className="bg-[#12121A] flex-1 h-screen overflow-y-auto overflow-x-hidden relative">
-        <div className={`grid gap-5 p-5 w-full ${
+      <div className="bg-[#12121A] flex-1 h-screen overflow-y-auto overflow-x-hidden custom-scrollbar relative z-0">
+        <div className={`grid gap-5 p-5 w-full pb-20 ${
           selectedVisualizations.length === 1 
             ? 'grid-cols-1' 
-            : 'grid-cols-1 md:grid-cols-2'
-        } auto-rows-fr`}>
-          {selectedVisualizations.map((viz, index) => {
+            : 'grid-cols-1 lg:grid-cols-2'
+        } auto-rows-fr ${isVizExpanding ? 'viz-expand' : ''}`}>
+          {/* Show both active and removed (animating) visualizations */}
+          {[...selectedVisualizations, ...removedVisualizations.filter(v => !selectedVisualizations.includes(v))].map((viz, index) => {
             const VisualizationComponent = visualizationComponents[viz]
             console.log('VisualizationComponent:', VisualizationComponent)
+            const isNewest = viz === newestVisualization;
+            const isRemoving = removingViz === viz;
+            
             return VisualizationComponent ? (
               <div 
-                key={index} 
+                key={viz} // Use viz as key instead of index for proper animation
+                ref={isNewest ? newestVizRef : null}
                 className={`bg-[#22222E] rounded-lg p-5 text-white flex flex-col ${
                   selectedVisualizations.length === 1 
-                    ? 'min-h-[calc(100vh-40px)]' // Full height minus padding
-                    : 'min-h-[400px]'
-                }`}
+                    ? 'min-h-[calc(100vh-40px)]' // Fixed height unaffected by chat pane
+                    : 'min-h-[450px]'
+                } ${isNewest ? 'viz-highlight newest-viz' : ''} 
+                ${addingViz === viz ? 'visualization-added' : ''} 
+                ${isRemoving ? 'visualization-removed' : ''} 
+                new-viz-enter new-viz-enter-active relative z-10`}
               >
-                {/* filename of the visualization TODO: where to add the filename so that it looks nice but able to refer to */}
-                {/* <h3 className="text-lg font-medium mb-4">{viz}</h3> */}
+                {/* Visualization title showing the filename */}
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-sm font-medium text-gray-400 truncate">
+                    {viz}
+                  </h3>
+                  {viz === newestVisualization && (
+                    <span className="text-xs bg-accent2 text-[#22222E] px-2 py-0.5 rounded-full animate-pulse">
+                      New
+                    </span>
+                  )}
+                </div>
                 <div className="flex-1 relative">
-                  <div className="absolute inset-0">
+                  <div className="absolute inset-0 visualization-container">
                     <VisualizationComponent />
                   </div>
                 </div>
@@ -513,7 +610,7 @@ function App() {
             ) : (
               <div key={index} className={`bg-[#22222E] rounded-lg p-5 text-white flex items-center justify-center ${
                 selectedVisualizations.length === 1 
-                  ? 'min-h-[calc(100vh-40px)]' 
+                  ? 'min-h-[calc(100vh-40px)]' // Fixed height unaffected by chat pane
                   : 'min-h-[400px]'
               }`}>
                 Loading visualization...
@@ -521,36 +618,50 @@ function App() {
             )
           })}
         </div>
+      </div>
 
-        {/* Terminal-like Chat Box */}
-        <div className={`fixed bottom-4 left-1/2 transform -translate-x-1/2 w-[800px] bg-[#22222E] rounded-lg shadow-lg transition-all duration-300 ${
-          isChatOpen ? 'h-[300px]' : 'h-12'
-        }`}>
-          <button
-            onClick={() => setIsChatOpen(!isChatOpen)}
-            className="w-full flex items-center justify-between px-4 py-2 bg-[#2D2D3B] rounded-t-lg text-white hover:bg-[#3C3C4E] transition-colors border-b border-[#1A1A24]"
-          >
-            <div className="flex items-center gap-2">
-              <FaComments className="w-4 h-4" />
-              <span className="font-mono text-sm">AI Terminal (Ctrl+I)</span>
-            </div>
-            {isChatOpen ? <FaChevronDown /> : <FaChevronUp />}
-          </button>
-          {isChatOpen && (
-            <div className="h-[calc(300px-48px)]">
-              <Chat 
-                hasSubscription={hasSubscription} 
-                onSubscribe={handleSubscribe}
-                activeConversationId={activeConversationId}
-                activeNodeId={activeNodeId}
-                onMessageSent={handleMessageSent}
-                messages={messages}
-                setMessages={setMessages}
-                refreshFileExplorer={refreshFileExplorer}
-              />
-            </div>
-          )}
+      {/* Floating Chat Button - Only visible when chat is hidden */}
+      {!isChatOpen && (
+        <div 
+          onClick={() => setIsChatOpen(true)}
+          className="fixed bottom-4 right-4 bg-[#2D2D3B] text-white p-3 rounded-full shadow-lg cursor-pointer hover:bg-[#3C3C4E] transition-colors z-50"
+          title="Open AI Terminal (Ctrl+I)"
+        >
+          <FaComments className="w-5 h-5" />
         </div>
+      )}
+
+      {/* Terminal-like Chat Box - Now floating over the canvas */}
+      <div className={`fixed bottom-4 left-1/2 transform -translate-x-1/2 w-[800px] bg-[#22222E] rounded-lg shadow-lg transition-all duration-300 ${
+        isChatOpen ? 'h-[300px] opacity-100 chat-active' : 'h-0 opacity-0 pointer-events-none'
+      } ${isChatCollapsing ? 'chat-collapse' : ''} z-50 chat-pane-overlay`}>
+        <button
+          onClick={() => setIsChatOpen(!isChatOpen)}
+          className={`w-full flex items-center justify-between px-4 py-2 bg-[#2D2D3B] rounded-t-lg text-white hover:bg-[#3C3C4E] transition-colors border-b border-[#1A1A24] ${
+            !isChatOpen && 'hidden'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <FaComments className="w-4 h-4" />
+            <span className="font-mono text-sm">AI Terminal (Ctrl+I)</span>
+          </div>
+          {isChatOpen ? <FaChevronDown /> : <FaChevronUp />}
+        </button>
+        {isChatOpen && (
+          <div className="h-[calc(300px-48px)]">
+            <Chat 
+              hasSubscription={hasSubscription} 
+              onSubscribe={handleSubscribe}
+              activeConversationId={activeConversationId}
+              activeNodeId={activeNodeId}
+              onMessageSent={handleMessageSent}
+              messages={messages}
+              setMessages={setMessages}
+              refreshFileExplorer={refreshFileExplorer}
+              collapseChat={collapseChat}
+            />
+          </div>
+        )}
       </div>
 
       {/* Toast Notification */}

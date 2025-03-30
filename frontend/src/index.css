@@ -1,3 +1,275 @@
 @tailwind base;
 @tailwind components;
-@tailwind utilities; 
+@tailwind utilities;
+
+/* Custom scrollbar styling for the entire application */
+@layer base {
+  /* For Webkit browsers (Chrome, Safari, etc.) */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #3C3C4E;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #46E4FD;
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* For Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #3C3C4E transparent;
+  }
+
+  /* When scrolling actively */
+  ::-webkit-scrollbar-thumb:active {
+    background: #3C93FD;
+  }
+}
+
+/* Apply scrollbar to specific elements */
+.custom-scrollbar {
+  @apply overflow-auto;
+  scrollbar-width: thin;
+  scrollbar-color: #3C3C4E transparent;
+}
+
+/* Scrollbar styling for visualizations */
+.visualization-container::-webkit-scrollbar,
+.d3-timeline-container::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.visualization-container::-webkit-scrollbar-thumb,
+.d3-timeline-container::-webkit-scrollbar-thumb {
+  background: #3C3C4E;
+  border-radius: 3px;
+}
+
+.visualization-container::-webkit-scrollbar-thumb:hover,
+.d3-timeline-container::-webkit-scrollbar-thumb:hover {
+  background: #46E4FD;
+}
+
+/* Styled scrollbars for code/data areas */
+.code-area::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.code-area::-webkit-scrollbar-track {
+  background: #1A1A24;
+  border-radius: 3px;
+}
+
+.code-area::-webkit-scrollbar-thumb {
+  background: #3C93FD;
+  border-radius: 3px;
+}
+
+.code-area::-webkit-scrollbar-thumb:hover {
+  background: #7667E6;
+}
+
+/* Global scrollbar styling for the entire application */
+.global-scrollbar-styles * {
+  scrollbar-width: thin;
+  scrollbar-color: #3C3C4E transparent;
+}
+
+.global-scrollbar-styles *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.global-scrollbar-styles *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.global-scrollbar-styles *::-webkit-scrollbar-thumb {
+  background: #3C3C4E;
+  border-radius: 4px;
+}
+
+.global-scrollbar-styles *::-webkit-scrollbar-thumb:hover {
+  background: #46E4FD;
+}
+
+.global-scrollbar-styles *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Animation for new visualizations */
+@keyframes highlight-fade {
+  0% { box-shadow: 0 0 0 2px rgba(70, 228, 253, 0.8); }
+  100% { box-shadow: 0 0 0 8px rgba(70, 228, 253, 0); }
+}
+
+.viz-highlight {
+  animation: highlight-fade 2s ease infinite;
+}
+
+.new-viz-enter {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.new-viz-enter-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 500ms, transform 500ms;
+}
+
+/* Typing indicator animation */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  column-gap: 5px;
+}
+
+.typing-indicator span {
+  height: 8px;
+  width: 8px;
+  background: #46E4FD;
+  border-radius: 50%;
+  display: block;
+  opacity: 0.4;
+}
+
+.typing-indicator span:nth-child(1) {
+  animation: pulse 1s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation: pulse 1s infinite ease-in-out 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation: pulse 1s infinite ease-in-out 0.4s;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+/* Animation for chat collapse and visualization focus */
+.chat-collapse {
+  animation: collapse-animate 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  pointer-events: none; /* Prevent interaction during animation */
+  z-index: 50 !important; /* Ensure it stays on top during animation */
+  position: fixed !important; /* Ensure it stays fixed to viewport */
+  bottom: 16px !important; /* Keep consistent positioning */
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+}
+
+.viz-expand {
+  animation: expand-animate 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+  position: relative;
+  z-index: 10;
+}
+
+@keyframes collapse-animate {
+  0% {
+    height: 300px;
+    opacity: 1;
+    z-index: 50;
+    transform: translateX(-50%);
+  }
+  70% {
+    opacity: 0.3;
+    z-index: 50;
+    transform: translateX(-50%);
+  }
+  100% {
+    height: 0;
+    opacity: 0;
+    z-index: 50;
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes expand-animate {
+  0% {
+    transform: scale(0.97);
+    opacity: 0.9;
+  }
+  40% {
+    transform: scale(1.01);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Styling for multiple visualizations */
+.multiple-viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+  gap: 1.25rem;
+}
+
+/* Enhancements for newest visualization */
+.newest-viz {
+  z-index: 20; /* Higher than regular visualizations but lower than chat */
+  position: relative;
+}
+
+.newest-viz::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  right: -5px;
+  bottom: -5px;
+  border-radius: 10px;
+  background: linear-gradient(45deg, #0CFCDD, #46E4FD, #3C93FD, transparent);
+  opacity: 0.2;
+  z-index: -1; /* Behind the visualization content */
+  animation: gradient-pulse 3s ease infinite;
+}
+
+@keyframes gradient-pulse {
+  0%, 100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Enhanced chat pane styling to ensure it's always on top */
+.chat-pane-overlay {
+  z-index: 50;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  position: fixed;
+  backdrop-filter: blur(3px);
+  border: 1px solid rgba(60, 60, 78, 0.5);
+}
+
+/* Add more depth to the chat when it's active */
+.chat-active {
+  box-shadow: 0 4px 20px rgba(70, 228, 253, 0.2);
+}

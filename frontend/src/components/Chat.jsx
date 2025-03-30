@@ -10,10 +10,13 @@ const Chat = ({
   onMessageSent,
   messages: externalMessages,
   setMessages: setExternalMessages,
-  refreshFileExplorer
+  refreshFileExplorer,
+  collapseChat
 }) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
+  const [isTypingResponse, setIsTypingResponse] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -112,16 +115,24 @@ const Chat = ({
       // Remove the loading message
       setExternalMessages(prev => prev.filter(msg => msg !== loadingMessage));
       
-      // Add AI response to UI with the generated visualization info
-      const aiResponseText = `I've created a visualization based on your prompt. You can view it by clicking on '${data.filename}' in the file explorer.`;
+      // Show typing animation
+      setIsTypingResponse(true);
       
-      const aiMessage = {
-        text: aiResponseText,
-        sender: 'ai',
-        timestamp: new Date().toISOString(),
-      };
-
-      setExternalMessages(prev => [...prev, aiMessage]);
+      // Add AI response to UI with the generated visualization info
+      const aiResponseText = `I've created a visualization based on your prompt. The visualization '${data.filename}' has been added to the canvas. You can interact with it alongside any existing visualizations.`;
+      
+      // Simulate typing delay for better UX
+      setTimeout(() => {
+        const aiMessage = {
+          text: aiResponseText,
+          sender: 'ai',
+          timestamp: new Date().toISOString(),
+        };
+  
+        setExternalMessages(prev => [...prev, aiMessage]);
+        setIsTypingResponse(false);
+        
+      }, 500);
       
       // No need to update the node with AI response as it's already done by the backend
       
@@ -134,12 +145,17 @@ const Chat = ({
       if (refreshFileExplorer) {
         console.log("Refreshing file explorer after generating visualization:", data.filename);
         refreshFileExplorer(data.filename);
+        
+          if (collapseChat) {
+            collapseChat(); // Now this will hide the chat pane completely
+          }
       }
     } catch (error) {
       console.error("Error handling chat message:", error);
       
       // Remove any loading message
       setExternalMessages(prev => prev.filter(msg => msg.text !== "Processing your request..."));
+      setIsTypingResponse(false);
       
       // Show error in chat
       setExternalMessages(prev => [...prev, {
@@ -153,7 +169,7 @@ const Chat = ({
   return (
     <div className="flex flex-col h-full bg-[#22222E] font-mono">
       {/* Messages container */}
-      <div className="flex-1 overflow-y-auto px-4 py-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+      <div className="flex-1 overflow-y-auto px-4 py-2 custom-scrollbar">
         {externalMessages.map((message, index) => (
           <div
             key={index}
@@ -170,7 +186,7 @@ const Chat = ({
                   message.sender === 'user'
                     ? 'bg-[#2D2D3B] text-white'
                     : 'bg-[#1A1A24] text-gray-100'
-                }`}
+                } ${message.isSystem ? 'italic text-accent2' : ''}`}
               >
                 {message.text}
               </div>
@@ -183,6 +199,21 @@ const Chat = ({
             </div>
           </div>
         ))}
+        
+        {/* Typing indicator */}
+        {isTypingResponse && (
+          <div className="flex items-start gap-2 mb-3">
+            <span className="text-[#3C3C4E] text-sm mt-1">$</span>
+            <div className="p-2 rounded-lg bg-[#1A1A24] text-gray-100">
+              <div className="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div ref={messagesEndRef} />
       </div>
 
@@ -206,6 +237,7 @@ const Chat = ({
         <div className="flex items-center gap-2">
           <span className="text-[#3C3C4E] text-sm">$</span>
           <input
+            ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}

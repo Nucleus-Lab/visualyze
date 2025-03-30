@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FaCheckCircle, FaTimes, FaExternalLinkAlt } from 'react-icons/fa';
 
-const Toast = ({ message, txHash, onClose, duration = 5000 }) => {
+const Toast = ({ message, txHash, onClose, duration = 3000 }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   // Auto-hide after duration

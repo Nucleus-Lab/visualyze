@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FaChevronRight, FaChevronDown, FaFolder, FaFolderOpen, FaFile } from 'react-icons/fa';
 
-const FileExplorer = ({ fileStructure, onFileSelect }) => {
+const FileExplorer = ({ fileStructure, onFileSelect, activeVisualizations = [] }) => {
   const [expandedFolders, setExpandedFolders] = useState(new Set());
   const [selectedFile, setSelectedFile] = useState(null);
 
@@ -34,14 +34,17 @@ const FileExplorer = ({ fileStructure, onFileSelect }) => {
       const currentPath = path ? `${path}/${name}` : name;
       const isFolder = content !== null;
       const isExpanded = expandedFolders.has(currentPath);
-      const isSelected = selectedFile === currentPath;
-
+      
+      // Check if this file is active in visualizations
+      const fileName = currentPath.split('/').pop();
+      const isActive = activeVisualizations.includes(fileName);
+      
       return (
         <div key={currentPath} className="">
           <div 
-            className={`flex items-center py-1 cursor-pointer hover:bg-black/10 rounded
+            className={`flex items-center py-1 cursor-pointer hover:bg-[#3C93FD]/10 rounded transition-colors
               ${isFolder ? 'text-gray-100' : 'text-gray-300'}
-              ${isSelected ? 'bg-[#3C93FD]/20 text-[#46E4FD]' : ''}`}
+              ${isActive ? 'bg-[#3C93FD]/20 text-[#46E4FD]' : ''}`}
             onClick={() => isFolder ? toggleFolder(currentPath) : handleFileSelect(currentPath)}
           >
             <span className="mr-1 flex items-center">
@@ -57,7 +60,7 @@ const FileExplorer = ({ fileStructure, onFileSelect }) => {
                   }
                 </>
               ) : (
-                <FaFile className={`w-4 h-4 ml-4 ${isSelected ? 'text-[#46E4FD]' : ''}`} />
+                <FaFile className={`w-4 h-4 ml-4 ${isActive ? 'text-[#46E4FD]' : ''}`} />
               )}
             </span>
             <span className="ml-1 text-sm">{name}</span>
