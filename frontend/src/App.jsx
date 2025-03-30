@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import FileExplorer from './components/FileExplorer'
 import Chat from './components/Chat'
-import { FaFolder, FaComments, FaChevronRight, FaChevronLeft, FaChevronDown, FaChevronUp, FaCrown, FaToggleOn, FaSignOutAlt } from 'react-icons/fa'
+import Toast from './components/Toast'
+import ChatHistory from './components/ChatHistory'
+import { FaFolder, FaComments, FaChevronRight, FaChevronLeft, FaChevronDown, FaChevronUp, FaCrown, FaToggleOn, FaSignOutAlt, FaHistory } from 'react-icons/fa'
 import { usePrivy, useWallets, useLogout } from '@privy-io/react-auth'
 import * as d3 from "d3";
 import React from "react";
 import { checkSubscription, subscribe } from './utils/contract';
+import { getConversations, getConversation, createConversation, getNodeBranch } from './utils/chatHistoryService';
 
 function App() {
   const { login, ready, authenticated, user, wallet } = usePrivy();
@@ -25,20 +28,61 @@ function App() {
   const [fileStructure, setFileStructure] = useState({
     visualizations: {}
   })
-  // Mock subscription state - will be replaced with actual contract interaction
+  
+  // Subscription state
   const [hasSubscription, setHasSubscription] = useState(false)
   const [subscriptionExpiry, setSubscriptionExpiry] = useState(null)
+  
+  // Toast notification state
+  const [toast, setToast] = useState(null)
 
-  // Temporary function to toggle subscription state
-  const toggleSubscription = () => {
-    setHasSubscription(prev => !prev);
-    if (!hasSubscription) {
-      // Set expiry to 30 days from now when subscribing
-      setSubscriptionExpiry(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
-    } else {
-      setSubscriptionExpiry(null);
-    }
+  // Chat history state
+  const [activeTab, setActiveTab] = useState('files');
+  const [chatHistory, setChatHistory] = useState([]);
+  const [activeNodeId, setActiveNodeId] = useState(null);
+  const [activeConversationId, setActiveConversationId] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // Function to show toast
+  const showToast = (message, txHash = null) => {
+    setToast({ message, txHash });
   };
+
+  // Function to hide toast
+  const hideToast = () => {
+    setToast(null);
+  };
+
+  // Load chat history
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      if (!authenticated) return;
+      
+      setIsLoadingHistory(true);
+      try {
+        const conversations = await getConversations();
+        setChatHistory(conversations || []);
+        
+        // Create a default conversation if none exists
+        if (!conversations || conversations.length === 0) {
+          const newConversation = await createConversation("New Conversation");
+          setChatHistory([newConversation]);
+          setActiveConversationId(newConversation.id);
+        } else {
+          // Set the most recent conversation as active
+          setActiveConversationId(conversations[0].id);
+        }
+      } catch (error) {
+        console.error("Error loading chat history:", error);
+        showToast("Failed to load chat history", null);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+    
+    loadChatHistory();
+  }, [authenticated]);
 
   // Add keyboard shortcuts
   useEffect(() => {
@@ -153,16 +197,20 @@ function App() {
 
       console.log("Starting subscription process");
       // Subscribe using the contract
-      await subscribe(wallets[0]);
+      const receipt = await subscribe(wallets[0]);
       
       // Check updated subscription status
       const subscription = await checkSubscription(user.wallet.address, wallets[0]);
       setHasSubscription(subscription.hasSubscription);
       setSubscriptionExpiry(subscription.expiryDate);
       console.log("Subscription completed successfully");
+      
+      // Show success toast with transaction hash
+      showToast('Subscription successful! You now have access to all premium features.', receipt.hash);
     } catch (error) {
       console.error('Error subscribing:', error);
-      // You might want to show an error message to the user here
+      // Show error toast
+      showToast('Subscription failed. Please try again.', null);
     }
   };
 
@@ -186,6 +234,97 @@ function App() {
     }
   };
 
+  // Handler for selecting a chat node
+  const handleChatNodeSelect = async (nodeId, conversationId) => {
+    try {
+      setActiveNodeId(nodeId);
+      setActiveConversationId(conversationId);
+      
+      // Get the conversation 
+      const conversation = await getConversation(conversationId);
+      
+      if (!conversation || !conversation.nodes || conversation.nodes.length === 0) {
+        console.error("No conversation found");
+        showToast("Failed to load conversation", null);
+        return;
+      }
+      
+      console.log("Received conversation:", conversation);
+      
+      // Convert nodes to UI message format - now much simpler!
+      const messagesFromConversation = [];
+      
+      // Filter out root nodes and sort by timestamp
+      const messageNodes = conversation.nodes
+        .filter(node => node.type !== "root")
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      
+      // Process nodes with new format (messages array)
+      const processedNodes = [];
+      
+      // First pass - extract message pairs from nodes with "messages" array
+      messageNodes.forEach(node => {
+        if (node.messages) {
+          // New format node with messages array
+          const userMessage = node.messages.find(m => m.type === "user");
+          const aiMessage = node.messages.find(m => m.type === "ai");
+          
+          if (userMessage) {
+            processedNodes.push({
+              id: node.id + "_user",
+              type: "user",
+              content: userMessage.content,
+              timestamp: userMessage.timestamp || node.timestamp
+            });
+          }
+          
+          if (aiMessage) {
+            processedNodes.push({
+              id: node.id + "_ai",
+              type: "ai",
+              content: aiMessage.content,
+              timestamp: aiMessage.timestamp || node.timestamp
+            });
+          }
+        } else {
+          // Legacy node format
+          processedNodes.push(node);
+        }
+      });
+      
+      // Sort all processed nodes by timestamp
+      processedNodes.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      
+      // Convert to UI messages
+      processedNodes.forEach(node => {
+        messagesFromConversation.push({
+          text: node.content,
+          sender: node.type === 'user' ? 'user' : 'ai',
+          timestamp: node.timestamp
+        });
+      });
+      
+      console.log("Generated chat messages:", messagesFromConversation);
+      
+      // Update messages in the chat - always showing the full conversation
+      setMessages(messagesFromConversation);
+    } catch (error) {
+      console.error("Error selecting chat node:", error);
+      showToast("Failed to load conversation", null);
+    }
+  };
+
+  // Handler for when new messages are sent in the chat
+  const handleMessageSent = async (conversationId, node) => {
+    // Refresh chat history to show new messages
+    try {
+      const conversations = await getConversations();
+      setChatHistory(conversations || []);
+    } catch (error) {
+      console.error("Error refreshing chat history:", error);
+    }
+  };
+
   // If Privy is not ready, show loading state
   if (!ready) {
     return (
@@ -205,7 +344,7 @@ function App() {
             onClick={login}
             className="px-6 py-3 bg-[#D4A017] text-white rounded-lg hover:bg-[#B38A14] transition-colors"
           >
-            Login with Privy
+            Start
           </button>
         </div>
       </div>
@@ -214,28 +353,69 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden">
-      {/* File Explorer Pane */}
+      {/* Left Pane with Tabs */}
       <div className={`flex h-full transition-all duration-300 ${isFileExplorerOpen ? 'w-60' : 'w-12'}`}>
         <div className={`h-full flex flex-col ${isFileExplorerOpen ? 'w-full bg-[#22222E]' : 'w-12 bg-[#22222E]'}`}>
           {isFileExplorerOpen ? (
-            // Full File Explorer
+            // Full Left Pane with Tabs
             <>
-              <div className="relative flex-1">
+              {/* Tabs Navigation */}
+              <div className="flex border-b border-[#1A1A24]">
+                <button 
+                  onClick={() => setActiveTab('files')}
+                  className={`flex-1 px-4 py-2 text-sm ${activeTab === 'files' ? 'text-white border-b-2 border-[#D4A017]' : 'text-gray-400 hover:text-white'}`}
+                >
+                  <div className="flex items-center justify-center">
+                    <FaFolder className="w-4 h-4 mr-2" />
+                    Files
+                  </div>
+                </button>
+                <button 
+                  onClick={() => setActiveTab('history')}
+                  className={`flex-1 px-4 py-2 text-sm ${activeTab === 'history' ? 'text-white border-b-2 border-[#D4A017]' : 'text-gray-400 hover:text-white'}`}
+                >
+                  <div className="flex items-center justify-center">
+                    <FaHistory className="w-4 h-4 mr-2" />
+                    History
+                  </div>
+                </button>
                 <button 
                   onClick={() => setIsFileExplorerOpen(false)}
-                  className="absolute top-5 right-1 w-6 h-6 bg-[#22222E] text-white border-none cursor-pointer flex items-center justify-center rounded z-20"
+                  className="w-8 flex items-center justify-center text-gray-400 hover:text-white"
                 >
                   <FaChevronLeft />
                 </button>
-                <div className="p-4">
-                  <h2 className="text-lg text-white font-medium mb-4">File Explorer (Ctrl+B)</h2>
-                  <FileExplorer 
-                    fileStructure={fileStructure} 
-                    onFileSelect={handleVisualizationSelect}
-                  />
-                </div>
               </div>
-              {/* Subscription Status and Button */}
+
+              {/* Tab Content */}
+              <div className="flex-1 overflow-auto">
+                {activeTab === 'files' ? (
+                  // File Explorer Content
+                  <div className="p-4">
+                    <FileExplorer 
+                      fileStructure={fileStructure} 
+                      onFileSelect={handleVisualizationSelect}
+                    />
+                  </div>
+                ) : (
+                  // Chat History Content
+                  <div className="p-4">
+                    {isLoadingHistory ? (
+                      <div className="text-center text-gray-400 py-4">
+                        Loading history...
+                      </div>
+                    ) : (
+                      <ChatHistory 
+                        conversations={chatHistory}
+                        onNodeSelect={handleChatNodeSelect}
+                        activeNodeId={activeNodeId}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Section with Subscription Status */}
               <div className="border-t border-[#1A1A24] p-4">
                 <div className="flex flex-col gap-3">
                   {/* Wallet Address */}
@@ -251,13 +431,6 @@ function App() {
                         <FaCrown className="w-4 h-4" />
                         <span>Premium until {subscriptionExpiry?.toLocaleDateString()}</span>
                       </div>
-                      <button
-                        onClick={toggleSubscription}
-                        className="text-xs text-gray-400 hover:text-white transition-colors"
-                        title="Toggle subscription state (temporary)"
-                      >
-                        <FaToggleOn className="w-4 h-4" />
-                      </button>
                     </div>
                   ) : (
                     <div className="flex items-center justify-between">
@@ -267,13 +440,6 @@ function App() {
                       >
                         <FaCrown className="w-4 h-4" />
                         Subscribe Now
-                      </button>
-                      <button
-                        onClick={toggleSubscription}
-                        className="text-xs text-gray-400 hover:text-white transition-colors"
-                        title="Toggle subscription state (temporary)"
-                      >
-                        <FaToggleOn className="w-4 h-4" />
                       </button>
                     </div>
                   )}
@@ -289,12 +455,12 @@ function App() {
               </div>
             </>
           ) : (
-            // Icon Only
+            // Icon Only View
             <button
               onClick={() => setIsFileExplorerOpen(true)}
               className="w-full flex flex-col items-center py-4"
             >
-              <div className="text-white hover:text-[#ABA9BF] transition-colors p-2 rounded flex items-center gap-2" title="Open File Explorer (Ctrl+B)">
+              <div className="text-white hover:text-[#ABA9BF] transition-colors p-2 rounded flex items-center gap-2" title="Open Explorer (Ctrl+B)">
                 <FaFolder className="w-6 h-6" />
               </div>
             </button>
@@ -357,11 +523,28 @@ function App() {
           </button>
           {isChatOpen && (
             <div className="h-[calc(300px-48px)]">
-              <Chat />
+              <Chat 
+                hasSubscription={hasSubscription} 
+                onSubscribe={handleSubscribe}
+                activeConversationId={activeConversationId}
+                activeNodeId={activeNodeId}
+                onMessageSent={handleMessageSent}
+                messages={messages}
+                setMessages={setMessages}
+              />
             </div>
           )}
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast 
+          message={toast.message} 
+          txHash={toast.txHash} 
+          onClose={hideToast} 
+        />
+      )}
     </div>
   )
 }

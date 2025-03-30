@@ -13,6 +13,7 @@
     "@privy-io/react-auth": "^2.7.2",
     "buffer": "^6.0.3",
     "d3": "^7.9.0",
+    "date-fns": "^4.1.0",
     "ethers": "^6.13.5",
     "process": "^0.11.10",
     "react": "^18.2.0",
