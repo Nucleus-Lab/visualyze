@@ -51,7 +51,7 @@ def main(prompt: str, csv_dir: str, viz_dir: str):
     )
     tasks = planner.split_task_by_prompt(prompt)
     results = []
-    for task in tasks[1:]:
+    for task in tasks:
         result = {"task": task, "result": "failed"}
         print(f"✅Processing task: {task}")
         sql_result, output_filename, table_detail = (
