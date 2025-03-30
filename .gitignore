@@ -4,3 +4,4 @@ ai_agent/
 .gitignore
 archive/
 data/share/
+share/
