@@ -109,5 +109,5 @@ A web application that allows users to chat with an AI agent to generate D3.js v
 
 ## TODOs
 
-[] TODO: fix a professional-looking font for visualizations?
-[] TODO: prompt to unlock wallet
+- [] TODO: fix a professional-looking font for visualizations?
+- [] TODO: prompt to unlock wallet
