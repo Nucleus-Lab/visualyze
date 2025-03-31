@@ -2,11 +2,13 @@
 
 A web application that allows users to chat with an AI agent to generate D3.js visualizations.
 
+Our SubscriptionNFT contract is deployed at on BSCTestnet. Check out the contract and related transaction histories here: https://testnet.bscscan.com/address/0xd63878fce308fdc2864b296334d96403910edb77
+
 ## Features
 
 - Chat interface to interact with an AI agent
 - D3.js visualization generation based on user prompts
-- Git-like chat history visualization
+- Intention-aware data analysis
 - File explorer to browse and view generated visualizations
 
 ## Getting Started
@@ -93,8 +95,9 @@ A web application that allows users to chat with an AI agent to generate D3.js v
 └── agents/             # AI agent implementation
 ```
 
+## Development Notes
 
-## Colour Palette
+### Colour Palette
 
 #12121A
 #22222E
@@ -107,7 +110,7 @@ A web application that allows users to chat with an AI agent to generate D3.js v
 
 ![Moodboard](images/moodboard.png)
 
-## TODO:
+### TODO:
 
 - [ ] enhance the AI agent workflow
 - [ ] fix a professional-looking font for visualizations?
