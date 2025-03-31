@@ -1,4 +1,4 @@
-# Chat Database with Visualization Generation
+# Visualyze: AI-Powered On-Chain Data Query, Visualization, and Analysis Tool
 
 A web application that allows users to chat with an AI agent to generate D3.js visualizations.
 
