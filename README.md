@@ -3,9 +3,9 @@
 Visualyze is an AI-powered tool that enables users to query, analyze, and visualize on-chain data using natural language.
 
 With Visualyze, you can:
-🔹 Ask questions in plain English—no complex queries required
-🔹 Get intuitive, interactive visualizations instantly
-🔹 Let AI handle the tedious data processing for you
+- Ask questions in plain English—no complex queries required
+- Get intuitive, interactive visualizations instantly
+- Let AI handle the tedious data processing for you
 
 Our SubscriptionNFT contract is deployed on BSC Testnet. Check out the contract and related transaction histories here: https://testnet.bscscan.com/address/0xd63878fce308fdc2864b296334d96403910edb77
 
