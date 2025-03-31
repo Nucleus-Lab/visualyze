@@ -19,7 +19,8 @@ class Plotter(dspy.Signature):
     7. For the large numbers in the axis labels, render in SI Prefixes (K, M, etc).
     8. You must include a title for the visualization
     9. We are using dark theme, so keep the text, axis labels, ticks, etc. in white color so that they are visible
-
+    10. When the numerical gap is too large, use a logarithmic visualization method.
+    
     # Color Palette
     #0CFCDD #46E4FD #3C93FD #2669FC #7667E6
 

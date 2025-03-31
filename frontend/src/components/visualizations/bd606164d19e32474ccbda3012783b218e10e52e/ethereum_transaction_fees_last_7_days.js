@@ -16,73 +16,65 @@ const GeneratedViz = () => {
         .attr("height", height)
         .attr("viewBox", [0, 0, width, height]);
 
-      const margin = { top: 40, right: 40, bottom: 50, left: 70 };
-      const innerWidth = width - margin.left - margin.right;
-      const innerHeight = height - margin.top - margin.bottom;
-
-      const x = d3.scaleTime().range([0, innerWidth]);
-      const y = d3.scaleLinear().range([innerHeight, 0]);
-
-      const g = svg.append("g")
-        .attr("transform", `translate(${margin.left},${margin.top})`);
-
       d3.csv("/data/ethereum_transaction_fees_last_7_days.csv").then(data => {
         data.forEach(d => {
           d.block_date = new Date(d.block_date);
           d.total_amount_usd = +d.total_amount_usd;
         });
 
-        x.domain(d3.extent(data, d => d.block_date));
-        y.domain([0, d3.max(data, d => d.total_amount_usd)]);
+        const x = d3.scaleTime()
+          .domain(d3.extent(data, d => d.block_date))
+          .range([60, width - 20]);
 
-        g.append("g")
-          .attr("transform", `translate(0,${innerHeight})`)
-          .call(d3.axisBottom(x).tickFormat(d3.timeFormat("%Y-%m-%d")).ticks(7))
-          .selectAll("text")
-          .style("fill", "#FFFFFF")
-          .style("text-anchor", "end")
-          .attr("dx", "-0.8em")
-          .attr("dy", "0.15em")
-          .attr("transform", "rotate(-65)");
+        const y = d3.scaleLinear()
+          .domain([0, d3.max(data, d => d.total_amount_usd)])
+          .nice()
+          .range([height - 40, 20]);
 
-        g.append("g")
-          .call(d3.axisLeft(y).tickFormat(d3.format(".2s")))
-          .selectAll("text")
-          .style("fill", "#FFFFFF");
+        const xAxis = g => g
+          .attr("transform", `translate(0,${height - 40})`)
+          .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0))
+          .call(g => g.select(".domain").remove())
+          .call(g => g.append("text")
+            .attr("x", width - 20)
+            .attr("y", -4)
+            .attr("fill", "white")
+            .attr("text-anchor", "end")
+            .text("Date"));
 
-        g.append("path")
+        const yAxis = g => g
+          .attr("transform", `translate(60,0)`)
+          .call(d3.axisLeft(y).ticks(height / 40, "~s"))
+          .call(g => g.select(".domain").remove())
+          .call(g => g.append("text")
+            .attr("x", 4)
+            .attr("y", 20)
+            .attr("fill", "white")
+            .attr("text-anchor", "start")
+            .text("Transaction Fees (USD)"));
+
+        svg.append("g")
+          .call(xAxis);
+
+        svg.append("g")
+          .call(yAxis);
+
+        svg.append("path")
           .datum(data)
           .attr("fill", "none")
-          .attr("stroke", "#0CFCDD")
-          .attr("stroke-width", 2)
+          .attr("stroke", "#46E4FD")
+          .attr("stroke-width", 1.5)
           .attr("d", d3.line()
             .x(d => x(d.block_date))
-            .y(d => y(d.total_amount_usd))
-          );
+            .y(d => y(d.total_amount_usd)));
 
         svg.append("text")
           .attr("x", width / 2)
-          .attr("y", margin.top / 2)
+          .attr("y", 10)
           .attr("text-anchor", "middle")
-          .style("fill", "#FFFFFF")
+          .attr("fill", "white")
           .style("font-size", "16px")
           .text("Ethereum Transaction Fees Over the Last 7 Days");
-
-        svg.append("text")
-          .attr("x", width - margin.right)
-          .attr("y", height - 10)
-          .attr("text-anchor", "end")
-          .style("fill", "#FFFFFF")
-          .text("Date");
-
-        svg.append("text")
-          .attr("transform", "rotate(-90)")
-          .attr("y", margin.left / 4)
-          .attr("x", -margin.top - innerHeight / 2)
-          .attr("dy", "1em")
-          .attr("text-anchor", "middle")
-          .style("fill", "#FFFFFF")
-          .text("Transaction Fees (USD)");
       });
     };
 

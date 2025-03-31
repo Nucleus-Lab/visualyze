@@ -89,6 +89,7 @@ def generate_figures(prompt: str, csv_dir: str, viz_dir: str):
         # if still error, skip the task
         if error:
             print(f"❌Error: {error}")
+            result["error"] = error
             return result
 
         print(f"✅Successfully executed query: {task_filename}")
@@ -131,8 +132,11 @@ def generate_figures(prompt: str, csv_dir: str, viz_dir: str):
                 try:
                     result = future.result()
                     completed_futures.append(future)
-                    results.append(result)
-                    print(f"✅ Task completed successfully: {result.get('task', 'Unknown')[:50]}...")
+                    if result.get('result') == 'failed':
+                        print(f"❌ Task failed with error: {result.get('error')}")
+                    else:
+                        results.append(result)
+                        print(f"✅ Task completed successfully: {result.get('task', 'Unknown')[:50]}...")
                 except Exception as e:
                     print(f"❌ Task failed with error: {str(e)}")
         except concurrent.futures.TimeoutError:
@@ -150,9 +154,17 @@ def generate_figures(prompt: str, csv_dir: str, viz_dir: str):
                     except Exception as e:
                         print(f"❌ Error retrieving result: {str(e)}")
             
-            # Cancel remaining tasks
+            # Cancel remaining tasks and force terminate Dune client connections
             for future in timed_out_futures:
                 future.cancel()
+            
+            # Force stop any ongoing Dune client operations
+            try:
+                # This will depend on how your DuneQueryClient is implemented
+                dune_client.terminate_all_queries()
+                print("🛑 Terminated all ongoing Dune client queries")
+            except Exception as e:
+                print(f"⚠️ Could not terminate Dune client queries: {str(e)}")
 
     return results
 

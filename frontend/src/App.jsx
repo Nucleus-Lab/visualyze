@@ -113,11 +113,12 @@ function App() {
         // Try multiple times with increasing delays
         while (retryCount <= retries) {
           try {
+            // Load from public directory
             response = await fetch(`http://localhost:8000/api/visualizations/${filePath}`);
             
             if (response.ok) {
               break; // Success, exit the retry loop
-    } else {
+            } else {
               console.log(`Attempt ${retryCount+1}/${retries+1} failed, retrying in ${delay}ms...`);
               await new Promise(resolve => setTimeout(resolve, delay));
               retryCount++;
@@ -255,7 +256,6 @@ function App() {
             setNewestVisualization(null);
           }, 4000);
           
-          
           // Wait for visualizations to render then download images
           setTimeout(async () => {
             for (const vizPath of newVisualizations) {
@@ -327,7 +327,7 @@ function App() {
                 // Handle error here
               }
             }
-          }, 1000); // Wait 1 second for rendering to complete
+          }, 1000); // Wait 1 seconds for rendering to complete
         }
       }
       

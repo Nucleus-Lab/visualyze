@@ -16,16 +16,16 @@ const GeneratedViz = () => {
         .attr("height", height)
         .attr("viewBox", [0, 0, width, height]);
 
-      const margin = { top: 20, right: 30, bottom: 30, left: 50 };
+      const margin = { top: 40, right: 30, bottom: 50, left: 60 };
       const innerWidth = width - margin.left - margin.right;
       const innerHeight = height - margin.top - margin.bottom;
 
       const parseDate = d3.timeParse("%Y-%m-%d");
 
-      d3.csv("/data/ethereum_price_last_7_days.csv").then(data => {
+      d3.csv("/data/ethereum_transactions_last_7_days.csv").then(data => {
         data.forEach(d => {
           d.block_date = parseDate(d.block_date);
-          d.avg_price_usd = +d.avg_price_usd;
+          d.transaction_count = +d.transaction_count;
         });
 
         const x = d3.scaleTime()
@@ -33,53 +33,58 @@ const GeneratedViz = () => {
           .range([0, innerWidth]);
 
         const y = d3.scaleLinear()
-          .domain([0, d3.max(data, d => d.avg_price_usd)])
+          .domain([0, d3.max(data, d => d.transaction_count)])
           .nice()
           .range([innerHeight, 0]);
 
-        const xAxis = d3.axisBottom(x).ticks(7).tickSizeOuter(0);
-        const yAxis = d3.axisLeft(y).ticks(5).tickFormat(d3.format(".2s"));
+        const xAxis = d3.axisBottom(x).tickSize(-innerHeight).tickPadding(10);
+        const yAxis = d3.axisLeft(y).tickSize(-innerWidth).tickPadding(10).tickFormat(d3.format(".2s"));
 
         const g = svg.append("g")
           .attr("transform", `translate(${margin.left},${margin.top})`);
 
         g.append("g")
-          .attr("transform", `translate(0,${innerHeight})`)
-          .call(xAxis)
-          .call(g => g.select(".domain").remove())
-          .call(g => g.append("text")
-            .attr("x", innerWidth)
-            .attr("y", margin.bottom - 4)
-            .attr("fill", "white")
-            .attr("text-anchor", "end")
-            .text("Date"));
+          .call(yAxis)
+          .selectAll("text")
+          .attr("fill", "white");
 
         g.append("g")
-          .call(yAxis)
-          .call(g => g.select(".domain").remove())
-          .call(g => g.append("text")
-            .attr("x", 4)
-            .attr("y", -10)
-            .attr("fill", "white")
-            .attr("text-anchor", "start")
-            .text("Average Price (USD)"));
+          .call(xAxis)
+          .attr("transform", `translate(0,${innerHeight})`)
+          .selectAll("text")
+          .attr("fill", "white");
 
         g.append("path")
           .datum(data)
           .attr("fill", "none")
-          .attr("stroke", "#0CFCDD")
+          .attr("stroke", "#46E4FD")
           .attr("stroke-width", 2)
           .attr("d", d3.line()
             .x(d => x(d.block_date))
-            .y(d => y(d.avg_price_usd)));
+            .y(d => y(d.transaction_count))
+          );
 
         svg.append("text")
           .attr("x", width / 2)
-          .attr("y", margin.top)
+          .attr("y", margin.top / 2)
           .attr("text-anchor", "middle")
           .attr("fill", "white")
           .style("font-size", "16px")
-          .text("Ethereum Price Over the Last 7 Days");
+          .text("Ethereum Transactions Over the Last 7 Days");
+
+        svg.append("text")
+          .attr("x", width - margin.right)
+          .attr("y", height - 10)
+          .attr("text-anchor", "end")
+          .attr("fill", "white")
+          .text("Date");
+
+        svg.append("text")
+          .attr("x", margin.left)
+          .attr("y", margin.top - 10)
+          .attr("text-anchor", "start")
+          .attr("fill", "white")
+          .text("Transaction Count");
       });
     };
 

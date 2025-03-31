@@ -40,7 +40,7 @@ app.add_middleware(
 
 # TODO: define this in config/.env
 # Define base visualization directory and user-specific paths
-VISUALIZATIONS_DIR = "frontend/src/components/visualizations"
+VISUALIZATIONS_DIR = "frontend/public/visualizations"
 TEMPLATES_DIR = os.path.join(VISUALIZATIONS_DIR, "templates")
 os.makedirs(VISUALIZATIONS_DIR, exist_ok=True)
 os.makedirs(TEMPLATES_DIR, exist_ok=True)
