@@ -107,7 +107,8 @@ A web application that allows users to chat with an AI agent to generate D3.js v
 
 ![Moodboard](images/moodboard.png)
 
-## TODOs
+## TODO:
 
-- [ ] TODO: fix a professional-looking font for visualizations?
-- [ ] TODO: prompt to unlock wallet
+- [ ] enhance the AI agent workflow
+- [ ] fix a professional-looking font for visualizations?
+- [ ] prompt to unlock wallet
