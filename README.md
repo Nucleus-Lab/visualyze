@@ -16,6 +16,24 @@ Our SubscriptionNFT contract is deployed on BSC Testnet. Check out the contract 
 - Intention-aware data analysis
 - File explorer to browse and view generated visualizations
 
+## Project Structure
+
+```
+├── backend/
+│   ├── main.py         # FastAPI application
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── components/ # React components
+│   │   ├── utils/      # Utility functions for API calls
+│   │   └── App.jsx     # Main application component
+│   ├── package.json
+│   └── vite.config.js
+├── hardhat/            # SubscriptionNFT Contract definition, testing and deploying scripts
+└── agents/             # AI agent implementation
+```
+
+
 ## Getting Started
 
 ### Prerequisites
@@ -83,22 +101,6 @@ Our SubscriptionNFT contract is deployed on BSC Testnet. Check out the contract 
 3. Type a prompt in the chat box asking for a visualization (e.g., "Is ethereum a good investment to make now?")
 4. The AI will process your prompt, generate D3.js visualization and analysis
 
-## Project Structure
-
-```
-├── backend/
-│   ├── main.py         # FastAPI application
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── components/ # React components
-│   │   ├── utils/      # Utility functions for API calls
-│   │   └── App.jsx     # Main application component
-│   ├── package.json
-│   └── vite.config.js
-├── hardhat/            # SubscriptionNFT Contract definition, testing and deploying scripts
-└── agents/             # AI agent implementation
-```
 
 ## Development Notes
 
